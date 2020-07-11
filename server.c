@@ -1,10 +1,10 @@
 /*
  *  ser6.c  - 	(Topic 11, HX 22/5/1995)
  *		An improved version of "ser5.c". This version handles the message boundaries
- *              which are not preserved by the TCP. Each message transmitted between the 
+ *              which are not preserved by the TCP. Each message transmitted between the
  *              client and the server is preceeded by a two byte value which is the length
  *              of the message. The handling of the message length is done in routines readn
- *              and writen.	
+ *              and writen.
  *  revised:	22/05/1996
  *  revised:	18/10/2006
  */
@@ -38,7 +38,7 @@ void claim_children()
 }
 
 
-void daemon_init(void)
+void daemon_init()
 {
   pid_t   pid;
   struct sigaction act;
@@ -53,7 +53,7 @@ void daemon_init(void)
 
   /* child continues */
   setsid();                      /* become session leader */
-  chdir("/");                    /* change working directory */
+  //chdir(cwd);                  /* attach daemon process to current server directory, comment out the change working directory */
   umask(0);                      /* clear file mode creation mask */
 
   /* catch SIGCHLD to remove zombies from system */
@@ -61,7 +61,7 @@ void daemon_init(void)
   sigemptyset(&act.sa_mask);       /* not to block other signals */
   act.sa_flags   = SA_NOCLDSTOP;   /* not catch stopped children */
   sigaction(SIGCHLD,(struct sigaction *)&act,(struct sigaction *)0);
-  /* note: a less than perfect method is to use 
+  /* note: a less than perfect method is to use
      signal(SIGCHLD, claim_children);
      */
 }
@@ -83,35 +83,64 @@ void serve_a_client(int sd)
     }
     buf[nr] = '\0';
 
+    /*parse command line from client
+     *print out the struct of received command
+     */
     cmd = buf;
     cl = process_cmd_line(cmd, 1);
-    
+
     while (cl[lc] != NULL) {
       dump_structure(cl[lc], lc);
       print_human_readable(cl[lc], lc);
       lc++;
     }
+    lc = 0; //reset lc for the next read
 
-    printf("Command: %s\n", cl[0]->com_name);
-    clean_up(cl);
+    /*map client_command to server_command*/
+    char * client_command;
+    client_command = cl[0]->com_name;
+    char * server_command;
+    if( strcmp(client_command, "pwd") == 0 ){
+      server_command = "pwd";
+    }else if( strcmp(client_command, "dir") == 0){
+      server_command = "ls";
+    }else if( strcmp(client_command, "cd") == 0){
+      //to-do
+      exit(0);
+    }else if( strcmp(client_command, "get") == 0){
+      //to-do
+      exit(0);
+    }else if( strcmp(client_command, "put") == 0){
+      //to-do
+      exit(0);
+    }else{
+      printf("Undefined command\n");
+      exit(0);
+    }
 
+    /*create child process to execute command received
+     *redirect standard output, standard error to socket
+     */
     if((pid = fork()) == 0){
 
       dup2(sd, STDOUT_FILENO);
       dup2(sd, STDERR_FILENO);
 
-      char arg[100] = "/bin/";
-      strcat(arg, buf);
+      char arg[256] = "/bin/";
+      strcat(arg, server_command);
 
-      execl(arg, buf, (char *)0);
-      printf("the execl call failed.");
+      execl(arg, server_command, (char *)0);
+      printf("the execl call failed.\n");
+
       exit(1);
     }else if ( pid < 0){
       printf("Fork failed\n");
       exit(1);
     }
 
-    printf("Waiting for next command\n");
+    clean_up(cl);
+    printf("Waiting for next command....\n\n");
+    wait(NULL); //wait until child process terminated, the parent continue to read next command
   }
 }
 
@@ -137,13 +166,13 @@ int main(int argc, char *argv[])
     printf("Usage: %s [ server listening port ]\n", argv[0]);
     exit(1);
   }
-
+  
   /* turn the program into a daemon */
-  //daemon_init();
+  daemon_init();
 
   /* set up listening socket sd */
   if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    printf("server:socket"); 
+    printf("server:socket");
     exit(1);
   }
 
@@ -178,7 +207,7 @@ int main(int argc, char *argv[])
 
     /* create a child process to handle this client */
     if ((pid=fork()) <0) {
-      printf("fork"); 
+      printf("fork");
       exit(1);
     } else if (pid > 0) {
       close(nsd);

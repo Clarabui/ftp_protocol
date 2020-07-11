@@ -303,7 +303,7 @@ dump_structure(command * c, int count)
 {
    int lc = 0;
 
-   printf("---- Command(%d) ----\n", count);
+   printf("\n---- Command(%d) ----\n", count);
    printf("%s\n", c->com_name);
    if (c->argv != NULL) {
       while (c->argv[lc] != NULL) {
@@ -353,7 +353,7 @@ print_human_readable(command * c, int count)
       printf("Redirect Output to %s.\n", c->redirect_out);
    if (c->pipe_to != 0)
       printf("Pipe Output to Command# %d\n", c->pipe_to);
-   printf("\n\n");
+   printf("\n");
 
    return;
 }                       /*End of print_human_readable() */

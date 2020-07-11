@@ -14,7 +14,6 @@
 #include  <netdb.h>            /* struct hostent, gethostbyname() */
 #include  <string.h>
 #include  "stream.h"           /* MAX_BLOCK_SIZE, readn(), writen() */
-#include  "parser.h"
 
 #define   SERV_TCP_PORT  40005 /* default server listening port */
 
@@ -68,8 +67,8 @@ int main(int argc, char *argv[])
   }
 
   while (1) {
-    printf("NEW VERSION\n");
-    printf("Client Input Command: ");
+
+    printf("\nClient Input Command: ");
     fgets(buf, sizeof(buf), stdin);
     nr = strlen(buf);
 
@@ -95,7 +94,7 @@ int main(int argc, char *argv[])
         exit(1);
       }
       buf[nr] = '\0';
-      printf("Sever Output: %s\n", buf);
+      printf("Server Output: %s\n", buf);
     }
   }
 }
