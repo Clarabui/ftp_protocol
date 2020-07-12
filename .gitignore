@@ -1,3 +1,5 @@
 *.o
 ser
 cli
+
+.idea
