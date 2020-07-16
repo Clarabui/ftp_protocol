@@ -1,6 +1,6 @@
 /*
  *  stream.h  - Topic 11, HX 22/5/1995)
- *	 	head file for stream read and stream write.
+ *	header file for stream read and stream write.
  */
 
 
@@ -11,7 +11,7 @@
  * purpose:  read a stream of bytes from "fd" to "buf".
  * pre:      1) size of buf bufsize >= MAX_BLOCK_SIZE,
  * post:     1) buf contains the byte stream;
- *           2) return value > 0   : number ofbytes read
+ *           2) return value > 0   : number of bytes read
  *                           = 0   : connection closed
  *                           = -1  : read error
  *                           = -2  : protocol error

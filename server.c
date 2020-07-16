@@ -2,7 +2,7 @@
  *  ser6.c  - 	(Topic 11, HX 22/5/1995)
  *		An improved version of "ser5.c". This version handles the message boundaries
  *              which are not preserved by the TCP. Each message transmitted between the
- *              client and the server is preceeded by a two byte value which is the length
+ *              client and the server is preceded by a two byte value which is the length
  *              of the message. The handling of the message length is done in routines readn
  *              and writen.
  *  revised:	22/05/1996
@@ -22,11 +22,8 @@
 /* and INADDR_ANY */
 #include  <unistd.h>
 #include  <sys/stat.h>
-
 #include  "stream.h"     /* MAX_BLOCK_SIZE, readn(), writen() */
 #include  "parser.h"
-
-
 #define   SERV_TCP_PORT   40005   /* default server listening port */
 
 void claim_children()
@@ -38,9 +35,9 @@ void claim_children()
 }
 
 
-void daemon_init()
+void daemon_init(const char *cwd)
 {
-  pid_t   pid;
+  pid_t pid;
   struct sigaction act;
 
   if ( (pid = fork()) < 0) {
@@ -48,13 +45,23 @@ void daemon_init()
     exit(1);
   } else if (pid > 0) {
     printf("Daemon PID =  %d\n", pid);
-    exit(0);                  /* parent goes bye-bye */
+    exit(0); /* parent goes bye-bye */
   }
 
   /* child continues */
-  setsid();                      /* become session leader */
-  //chdir(cwd);                  /* attach daemon process to current server directory, comment out the change working directory */
-  umask(0);                      /* clear file mode creation mask */
+  setsid(); /* become session leader */
+
+  /* attach daemon process to current server directory,
+   * comment out to change working directory
+   * Check if cwd != null
+   * */
+  if (cwd != NULL) {
+//      chdir(cwd);
+    printf("inside deamon %c: ", *cwd);
+  }
+
+  /* clear file mode creation mask */
+  umask(0);
 
   /* catch SIGCHLD to remove zombies from system */
   act.sa_handler = claim_children; /* use reliable signal */
@@ -62,8 +69,9 @@ void daemon_init()
   act.sa_flags   = SA_NOCLDSTOP;   /* not catch stopped children */
   sigaction(SIGCHLD,(struct sigaction *)&act,(struct sigaction *)0);
   /* note: a less than perfect method is to use
-     signal(SIGCHLD, claim_children);
+        signal(SIGCHLD, claim_children);
      */
+
 }
 
 void serve_a_client(int sd)
@@ -73,9 +81,9 @@ void serve_a_client(int sd)
   char buf[MAX_BLOCK_SIZE];
   char *cmd;
   command **cl;
+  char cwd[MAX_BLOCK_SIZE];
 
-
-  while (1){
+  while (1) {
     /* read data from client */
     if ((nr = read(sd, buf, sizeof(buf))) <= 0){
       printf("Connection is broken\n");
@@ -97,21 +105,22 @@ void serve_a_client(int sd)
     lc = 0; //reset lc for the next read
 
     /*map client_command to server_command*/
-    char * client_command;
+    char *client_command;
     client_command = cl[0]->com_name;
     char * server_command;
     if( strcmp(client_command, "pwd") == 0 ){
       server_command = "pwd";
-    }else if( strcmp(client_command, "dir") == 0){
+    }else if( strcmp(client_command, "dir") == 0) {
       server_command = "ls";
-    }else if( strcmp(client_command, "cd") == 0){
-      //to-do
+    }else if( strcmp(client_command, "cd") == 0) {
+
+
       exit(0);
-    }else if( strcmp(client_command, "get") == 0){
-      //to-do
+    }else if( strcmp(client_command, "get") == 0) {
+        // TODO
       exit(0);
-    }else if( strcmp(client_command, "put") == 0){
-      //to-do
+    }else if( strcmp(client_command, "put") == 0) {
+        // TODO
       exit(0);
     }else{
       printf("Undefined command\n");
@@ -123,16 +132,17 @@ void serve_a_client(int sd)
      */
     if((pid = fork()) == 0){
 
-      dup2(sd, STDOUT_FILENO);
-      dup2(sd, STDERR_FILENO);
+      dup2(sd, STDOUT_FILENO); // redirect to standard output
+      dup2(sd, STDERR_FILENO); // redirect to standard error
 
       char arg[256] = "/bin/";
       strcat(arg, server_command);
 
       execl(arg, server_command, (char *)0);
+      // this would be called only if above statement fails
       printf("the execl call failed.\n");
-
       exit(1);
+
     }else if ( pid < 0){
       printf("Fork failed\n");
       exit(1);
@@ -151,28 +161,22 @@ int main(int argc, char *argv[])
   unsigned short port;   // server listening port
   socklen_t cli_addrlen;
   struct sockaddr_in ser_addr, cli_addr;
+  char cwd[MAX_BLOCK_SIZE];
   /* get the port number */
-  if (argc == 1) {
-    port = SERV_TCP_PORT;
-  } else if (argc == 2) {
-    int n = atoi(argv[1]);
-    if (n >= 1024 && n < 65536)
-      port = n;
-    else {
-      printf("Error: port number must be between 1024 and 65535\n");
-      exit(1);
-    }
-  } else {
-    printf("Usage: %s [ server listening port ]\n", argv[0]);
-    exit(1);
+  port = SERV_TCP_PORT;
+  printf("Usage: %d [ server listening port ]\n", port);
+  if ( argv[1] != NULL ) {
+    strcpy(cwd, argv[1]);
+    printf("some arguments given when starting server");
+//    exit(1);
   }
   
   /* turn the program into a daemon */
-  daemon_init();
+  daemon_init(cwd);
 
   /* set up listening socket sd */
   if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    printf("server:socket");
+    printf("server:socket-ERROR");
     exit(1);
   }
 
@@ -195,14 +199,14 @@ int main(int argc, char *argv[])
   listen(sd, 5);
 
   while (1) {
-
     /* wait to accept a client request for connection */
     cli_addrlen = sizeof(cli_addr);
     nsd = accept(sd, (struct sockaddr *) &cli_addr, &cli_addrlen);
     if (nsd < 0) {
       if (errno == EINTR)   /* if interrupted by SIGCHLD */
         continue;
-      printf("server:accept"); exit(1);
+      printf("server:accept");
+      exit(1);
     }
 
     /* create a child process to handle this client */
@@ -217,7 +221,7 @@ int main(int argc, char *argv[])
     /* now in child, serve the current client */
     close(sd);
 
-    /*refirect output of child prgram output to socket*/
+    /*redirect output of child program output to socket*/
     serve_a_client(nsd);
     exit(0);
   }

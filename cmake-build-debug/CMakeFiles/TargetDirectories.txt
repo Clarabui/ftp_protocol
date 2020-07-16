@@ -1,0 +1,5 @@
+/Users/navintamilchelvampro/c/ftp_protocol/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/navintamilchelvampro/c/ftp_protocol/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/navintamilchelvampro/c/ftp_protocol/cmake-build-debug/CMakeFiles/server.o.dir
+/Users/navintamilchelvampro/c/ftp_protocol/cmake-build-debug/CMakeFiles/stream.o.dir
+/Users/navintamilchelvampro/c/ftp_protocol/cmake-build-debug/CMakeFiles/client.o.dir

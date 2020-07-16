@@ -37,7 +37,7 @@ command ** process_cmd_line(char *cmd,int);
 void process_cmd(char *cmd, command * result);
 void process_simple_cmd(char *cmd, command * result);
 void clean_up(command ** cmd);
-void clean_up(command ** cmd);
-void clean_up(command ** cmd);
+void dump_structure(command *c, int);
+void print_human_readable(command *cmd, int);
 
 #endif

@@ -1,6 +1,6 @@
 # Makefile for this assignment
 server: stream.o parser.o server.o
-	gcc stream.o parser.o server.o -o ser
+	gcc stream.o parser.o server.o -o myftpd
 
 stream.o: stream.h stream.c
 	gcc -c stream.c
@@ -12,10 +12,10 @@ server.o: server.c
 	gcc -c server.c
 
 client: stream.o client.o
-	gcc stream.o client.o -o cli
+	gcc stream.o client.o -o myftp
 
 client.o: client.c
 	gcc -c client.c
 
 clean:
-	rm *.o ser cli
+	rm *.o myftpd myftp

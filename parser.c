@@ -76,7 +76,7 @@ process_simple_cmd(char *cmd, command * result)
    result->argv[lpc] = NULL;
 
    return;
-}                       /*End of process_simple_cmd() */
+}  /*End of process_simple_cmd() */
 
 
 /*
@@ -116,7 +116,7 @@ process_cmd(char *cmd, command * result)
          result->redirect_out = strdup(pc);
       }
    }
-   else {               /*Input Redirection */
+   else { /*Input Redirection */
       pc = strtok(cmd, "<");
       simple_cmd = strdup(pc);
       pc = strtok(NULL, "\0");
@@ -134,13 +134,13 @@ process_cmd(char *cmd, command * result)
 
    free(simple_cmd);
    return;
-}                       /*End of process_cmd() */
+} /*End of process_cmd() */
 
 /*
  * This function processes the command line. It isolates tokens seperated by
  * the '&' or the '|' character. The tokens are then passed on to be processed
  * by other functions. Once the first token has been isolated this function is
- * called recursivly to process the rest of the command line. Once the entire
+ * called recursively to process the rest of the command line. Once the entire
  * command line has been processed an array of command structures is created
  * and returned.
  *
@@ -159,52 +159,52 @@ process_cmd_line(char *cmd,int new)
    static command **cmd_line;
    static int lc;
 
-   // nick nelissen added this 23/9/01
-   // ensures statics are null, when not recursively called 
+   // ensures statics are null, when not recursively called
+   // flush....
    if(new==1){
 	lc=0;
 	cmd_line=NULL;
    }
 
-
    /*
-    * Check for the existance of delimitors.
-    * If no delimitors exist, we only have one command on the command line.
+    * Check for the existence of delimiters.
+    * If no delimiters exist, we only have one command on the command line.
     * Otherwise process accordingly.
     */
 
    if ((rc = index(cmd, '&')) == NULL) {
-      if ((rc = index(cmd, '|')) == NULL) {
-         //cmd_line = realloc((void *) cmd_line, (lc + 1) * sizeof(command *));
-	 cmd_line = realloc(cmd_line, (lc + 1) * sizeof(command *));
-		 
-	 if(cmd_line==NULL){
-		exit(-1);
-	 }
+       if ((rc = index(cmd, '|')) == NULL) {
+             //cmd_line = realloc((void *) cmd_line, (lc + 1) * sizeof(command *));
+            // de-allocates the old object pointed to by cmd_line and returns a pointer
+            // to a new object that has the size specified by size
+            cmd_line = realloc(cmd_line, (lc + 1) * sizeof(command *));
 
-         cmd_line[lc] = malloc(sizeof(command));
-         if(cmd_line[lc]==NULL){
-		exit(-1);
-	 }
-	 // nick added this to NULL the new struct
-         cmd_line[lc]->argv=NULL;
-	 cmd_line[lc]->redirect_in=NULL;
-	 cmd_line[lc]->redirect_out=NULL;
-         cmd_line[lc]->com_name=NULL;
-         cmd_line[lc]->pipe_to=0;
-	 cmd_line[lc]->background=0;	 
+             if(cmd_line==NULL){
+                exit(-1);
+             }
+
+             cmd_line[lc] = malloc(sizeof(command));
+             if(cmd_line[lc]==NULL){
+                exit(-1);
+             }
+             // nick added this to NULL the new struct
+             cmd_line[lc]->argv=NULL;
+             cmd_line[lc]->redirect_in=NULL;
+             cmd_line[lc]->redirect_out=NULL;
+             cmd_line[lc]->com_name=NULL;
+             cmd_line[lc]->pipe_to=0;
+             cmd_line[lc]->background=0;
 
 
-         process_cmd(cmd, cmd_line[lc]);
+             process_cmd(cmd, cmd_line[lc]);
 
-         lc++;
-      }
-      else {            /*A '|' was found */
+             lc++;
+       }
+       else {            /*A '|' was found */
          rc = strtok(cmd, "|");
          rc = strtok(NULL, "");	/*Get the second token out */
 
          cmd_line = realloc((void *) cmd_line, (lc + 1) * sizeof(command *));
-	 // nick changed this, same as nulling each element
          //cmd_line[lc] = malloc(sizeof(command));
          cmd_line[lc] = calloc(1,sizeof(command));
 
@@ -225,8 +225,8 @@ process_cmd_line(char *cmd,int new)
       else {
          cmd_line = realloc((void *) cmd_line, (lc + 1) * sizeof(command *));
          // nick changed this
-	 //cmd_line[lc] = malloc(sizeof(command));
-	 cmd_line[lc] = calloc(1,sizeof(command));
+         //cmd_line[lc] = malloc(sizeof(command));
+         cmd_line[lc] = calloc(1,sizeof(command));
 
          process_cmd(cmd, cmd_line[lc]);
          cmd_line[lc]->background = 1;
@@ -243,7 +243,9 @@ process_cmd_line(char *cmd,int new)
    free(rc_copy);
 
    return cmd_line;
-}                       /*End of Process Cmd Line */
+}  /*End of Process Cmd Line */
+
+
 
 /*
  * This function cleans up some of the dynamicly allocated memory. Each array
@@ -356,6 +358,6 @@ print_human_readable(command * c, int count)
    printf("\n");
 
    return;
-}                       /*End of print_human_readable() */
+} /*End of print_human_readable() */
 
 
