@@ -129,11 +129,13 @@ void process_dir(char * server_command, int sd){
 void process_get(char * file_name, int sd){
   int fd;
   struct stat f_info;
-  char * msg1;
-  char msg2[MAX_BLOCK_SIZE];
+  char msg1[200];
+  char msg2[20];
+  char buf[MAX_BLOCK_SIZE];
 
   if( (fd = open(file_name, O_RDONLY)) == -1 ){
-    printf("File does not exist\n");
+    //sprintf(msg1, "File %s does not exist\n", file_name);
+    //write(sd, msg1, strlen(msg1));
     exit(1);
   }
 
@@ -143,18 +145,37 @@ void process_get(char * file_name, int sd){
   }
 
   sprintf(msg1, "File exists! File size: %lld bytes. Do you want to continue?(Y/N)", f_info.st_size);
-
   write(sd, msg1, strlen(msg1));
-  printf("ERRORRRRRR\n");
-  read(sd, msg2, strlen(msg2));
-  trim(msg2);
-  printf("Received %s", msg2);
 
-  if(strcmp(msg2, "Y") == 0){
+  read(sd, msg2, sizeof(msg2));
+
+  printf("Received '%s'", msg2);
+
+  if( strcmp(msg2, "Y") == 0){
     printf("\nStart sending file\n");
+    int nr, nw;
+
+    printf("------DEBUG nc = %d\n", nr);
+    printf(":------DEBUD fd = %d\n", fd);
+    while (1){
+      if ((nr = readn(fd, buf, sizeof(buf))) <= 0 ){
+        printf("------DEBUG nc = %d\n", nr);
+        printf("Read from file error\n");
+        exit(1);
+      }
+      
+      printf("------DEBUG nw = %d\n", nw);
+      if ((nw = writen(sd, buf, strlen(buf))) < 0){
+        printf("Write to socket error\n");
+        exit(1);
+      }
+    }
+
   }else{
     printf("\nDont send file\n");
+    exit(0);
   }
+  close(fd);
   exit(0);
 
 }
@@ -175,141 +196,141 @@ void serve_a_client(int sd)
     buf[nr] = '\0';
 
     /*parse command line from client into server command array */
-      tk_num = tokenise(buf, command_array);
+    tk_num = tokenise(buf, command_array);
 
-      if(tk_num != -1){
-        printf("Number of argument: %d\n", tk_num);
-        for(int i = 0; i< tk_num; i++){
-          printf("Argument %d: %s\n", i + 1, command_array[i]);
-        }
-      }else{
-        printf("Command array size is too small\n");
+    if(tk_num != -1){
+      printf("Number of argument: %d\n", tk_num);
+      for(int i = 0; i< tk_num; i++){
+        printf("Argument %d: %s\n", i + 1, command_array[i]);
       }
-
-      /*map client_command to server_command*/
-      char * client_command;
-      char * server_command;
-      char * file_name;
-
-      client_command = command_array[0];
-      file_name = command_array[1];
-
-      if( strcmp(client_command, "pwd") == 0 ){
-        server_command = "pwd";
-        process_pwd(server_command, sd);
-      }else if( strcmp(client_command, "dir") == 0){
-        server_command = "ls";
-        process_dir(server_command, sd);
-      }else if( strcmp(client_command, "cd") == 0){
-        //to-do
-        exit(0);
-      }else if( strcmp(client_command, "get") == 0){
-        process_get(file_name, sd);
-      }else if( strcmp(client_command, "put") == 0){
-        //to-do
-        exit(0);
-      }else{
-        printf("Undefined command\n");
-        exit(0);
-      }
-
-      printf("Waiting for next command....\n\n");
-      wait(NULL); //wait until child process terminated, the parent continue to read next command
-    }
-  }
-
-  int main(int argc, char *argv[])
-  {
-    int sd, nsd, n;
-    extern int errno;
-    pid_t pid;
-    FILE * log;
-    char * logfilename = "Logfile";
-
-    unsigned short port;   // server listening port
-    socklen_t cli_addrlen;
-    struct sockaddr_in ser_addr, cli_addr;
-    /* get the port number */
-    if (argc == 1) {
-      port = SERV_TCP_PORT;
-    } else if (argc == 2) {
-      int n = atoi(argv[1]);
-      if (n >= 1024 && n < 65536)
-        port = n;
-      else {
-        printf("Error: port number must be between 1024 and 65535\n");
-        exit(1);
-      }
-    } else {
-      printf("Usage: %s [ server listening port ]\n", argv[0]);
-      exit(1);
-    }
-    /* create log file */
-    log = fopen(logfilename, "w");
-    if (log == NULL){
-      printf("ERROR: Can't create a log file\n");
-      exit(3);
+    }else{
+      printf("Command array size is too small\n");
     }
 
-    /* turn the program into a daemon */
-    if (daemon_init() == -1){
-      printf("ERROR: Can't become a daemon\n");
-      exit(4);
-    }
+    /*map client_command to server_command*/
+    char * client_command;
+    char * server_command;
+    char * file_name;
 
-    fprintf(log, "Server pid = %d\n", getpid());
-    fflush(log);
+    client_command = command_array[0];
+    file_name = command_array[1];
 
-    /* set up listening socket sd */
-    if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-      fprintf(log, "server:socket");
-      exit(1);
-    }
-
-    /* build server Internet socket address */
-    bzero((char *)&ser_addr, sizeof(ser_addr));
-    ser_addr.sin_family = AF_INET;
-    ser_addr.sin_port = htons(port);
-    ser_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    /* note: accept client request sent to any one of the
-       network interface(s) on this host.
-       */
-
-    /* bind server address to socket sd */
-    if (bind(sd, (struct sockaddr *) &ser_addr, sizeof(ser_addr))<0){
-      fprintf(log,"server bind");
-      exit(1);
-    }
-
-    /* become a listening socket */
-    listen(sd, 5);
-
-    while (1) {
-
-      /* wait to accept a client request for connection */
-      cli_addrlen = sizeof(cli_addr);
-      nsd = accept(sd, (struct sockaddr *) &cli_addr, &cli_addrlen);
-      if (nsd < 0) {
-        if (errno == EINTR)   /* if interrupted by SIGCHLD */
-          continue;
-        fprintf(log,"server:accept"); 
-        exit(1);
-      }
-
-      /* create a child process to handle this client */
-      if ((pid=fork()) <0) {
-        printf("fork failed");
-        exit(1);
-      } else if (pid > 0) {
-        close(nsd);
-        continue; /* parent to wait for next client */
-      }
-
-      /* now in child, serve the current client */
-      close(sd);
-
-      /*refirect output of child prgram output to socket*/
-      serve_a_client(nsd);
+    if( strcmp(client_command, "pwd") == 0 ){
+      server_command = "pwd";
+      process_pwd(server_command, sd);
+    }else if( strcmp(client_command, "dir") == 0){
+      server_command = "ls";
+      process_dir(server_command, sd);
+    }else if( strcmp(client_command, "cd") == 0){
+      //to-do
       exit(0);
+    }else if( strcmp(client_command, "get") == 0){
+      process_get(file_name, sd);
+    }else if( strcmp(client_command, "put") == 0){
+      //to-do
+      exit(0);
+    }else{
+      printf("Undefined command\n");
+        exit(0);
     }
+
+    printf("Waiting for next command....\n\n");
+    wait(NULL); //wait until child process terminated, the parent continue to read next command
   }
+}
+
+int main(int argc, char *argv[])
+{
+  int sd, nsd, n;
+  extern int errno;
+  pid_t pid;
+  FILE * log;
+  char * logfilename = "Logfile";
+
+  unsigned short port;   // server listening port
+  socklen_t cli_addrlen;
+  struct sockaddr_in ser_addr, cli_addr;
+  /* get the port number */
+  if (argc == 1) {
+    port = SERV_TCP_PORT;
+  } else if (argc == 2) {
+    int n = atoi(argv[1]);
+    if (n >= 1024 && n < 65536)
+      port = n;
+    else {
+      printf("Error: port number must be between 1024 and 65535\n");
+      exit(1);
+    }
+  } else {
+    printf("Usage: %s [ server listening port ]\n", argv[0]);
+    exit(1);
+  }
+  /* create log file */
+  log = fopen(logfilename, "w");
+  if (log == NULL){
+    printf("ERROR: Can't create a log file\n");
+    exit(3);
+  }
+
+  /* turn the program into a daemon */
+  if (daemon_init() == -1){
+    printf("ERROR: Can't become a daemon\n");
+    exit(4);
+  }
+
+  fprintf(log, "Server pid = %d\n", getpid());
+  fflush(log);
+
+  /* set up listening socket sd */
+  if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+    fprintf(log, "server:socket");
+    exit(1);
+  }
+
+  /* build server Internet socket address */
+  bzero((char *)&ser_addr, sizeof(ser_addr));
+  ser_addr.sin_family = AF_INET;
+  ser_addr.sin_port = htons(port);
+  ser_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  /* note: accept client request sent to any one of the
+     network interface(s) on this host.
+     */
+
+  /* bind server address to socket sd */
+  if (bind(sd, (struct sockaddr *) &ser_addr, sizeof(ser_addr))<0){
+    fprintf(log,"server bind");
+    exit(1);
+  }
+
+  /* become a listening socket */
+  listen(sd, 5);
+
+  while (1) {
+
+    /* wait to accept a client request for connection */
+    cli_addrlen = sizeof(cli_addr);
+    nsd = accept(sd, (struct sockaddr *) &cli_addr, &cli_addrlen);
+    if (nsd < 0) {
+      if (errno == EINTR)   /* if interrupted by SIGCHLD */
+        continue;
+      fprintf(log,"server:accept"); 
+      exit(1);
+    }
+
+    /* create a child process to handle this client */
+    if ((pid=fork()) <0) {
+      printf("fork failed");
+      exit(1);
+    } else if (pid > 0) {
+      close(nsd);
+      continue; /* parent to wait for next client */
+    }
+
+    /* now in child, serve the current client */
+    close(sd);
+
+    /*refirect output of child prgram output to socket*/
+    serve_a_client(nsd);
+    exit(0);
+  }
+}

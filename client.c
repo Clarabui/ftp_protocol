@@ -14,6 +14,7 @@
 #include  <netdb.h>            /* struct hostent, gethostbyname() */
 #include  <string.h>
 #include  <errno.h>
+#include  <fcntl.h>
 #include  "token.h"
 #include  "stream.h"           /* MAX_BLOCK_SIZE, readn(), writen() */
 
@@ -101,11 +102,15 @@ int main(int argc, char *argv[])
       /* parse command line into command array*/
       tokenise(buf, command_array);
       char * client_command;
+      char * file_name;
       client_command = command_array[0];
+      file_name = command_array[1];
       printf("COMMAND: %s\n", client_command);
 
+      /* implement get method */
+
       if(strcmp(client_command, "get") == 0){
-        if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+        if ((nr=read(sd, buf1, sizeof(buf1))) <= 0) {
           printf("Client: receive error\n");
           exit(1);
         }
@@ -115,10 +120,29 @@ int main(int argc, char *argv[])
 
         printf("Enter Y/N: ");
         fgets(buf2, sizeof(buf2), stdin);
+        nr = strlen(buf2);
         trim(buf2);
-        write(sd, buf2, strlen(buf2));
+        write(sd, buf2, nr);
 
-        /* Downloading file*/
+        /* Downloading file
+         * Create file if it does not exist
+         * */
+        int fd;
+        fd = open("foo", O_WRONLY|O_CREAT, 0766);
+        char buf3[MAX_BLOCK_SIZE];
+
+        while(1){
+          if (( readn(sd, buf3, sizeof(buf3))) <= 0){
+            printf("Failed to read from socket\n");
+            exit(1);
+          }
+
+          if (( writen(fd, buf3, strlen(buf3))) < 0){
+            printf("Failed to write to file\n");
+            exit(1);
+          }
+        }
+
       }
 
       if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
