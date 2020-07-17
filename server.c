@@ -66,9 +66,64 @@ void daemon_init()
      */
 }
 
+void process_pwd(char * server_command, int sd){
+
+  /*create child process to execute command received
+   *redirect standard output, standard error to socket
+   */
+  int pid;
+
+  if((pid = fork()) == 0){
+
+    dup2(sd, STDOUT_FILENO);
+    dup2(sd, STDERR_FILENO);
+
+    char arg[256] = "/bin/";
+    strcat(arg, server_command);
+
+    execl(arg, server_command, (char *)0);
+    printf("the execl call failed.\n");
+
+    exit(1);
+  }else if ( pid < 0){
+    printf("Fork failed\n");
+    exit(1);
+  }
+}
+
+
+void process_dir(char * server_command, int sd){
+
+  /*create child process to execute command received
+   *redirect standard output, standard error to socket
+   */
+  int pid;
+
+  if((pid = fork()) == 0){
+
+    dup2(sd, STDOUT_FILENO);
+    dup2(sd, STDERR_FILENO);
+
+    char arg[256] = "/bin/";
+    strcat(arg, server_command);
+
+    execl(arg, server_command, (char *)0);
+    printf("the execl call failed.\n");
+
+    exit(1);
+  }else if ( pid < 0){
+    printf("Fork failed\n");
+    exit(1);
+  }
+}
+
+void process_get(char * file_name, int sd){
+  exit(0);
+}
+
 void serve_a_client(int sd)
 {
-  int nr, nw, pid;
+  int nr, nw;
   int lc =0;
   char buf[MAX_BLOCK_SIZE];
   char *cmd;
@@ -98,44 +153,28 @@ void serve_a_client(int sd)
 
     /*map client_command to server_command*/
     char * client_command;
-    client_command = cl[0]->com_name;
     char * server_command;
+    char * file_name;
+    client_command = cl[0]->com_name;
+
+    printf("Filename: %c\n", file_name);
     if( strcmp(client_command, "pwd") == 0 ){
       server_command = "pwd";
+      process_pwd(server_command, sd);
     }else if( strcmp(client_command, "dir") == 0){
       server_command = "ls";
+      process_dir(server_command, sd);
     }else if( strcmp(client_command, "cd") == 0){
       //to-do
       exit(0);
     }else if( strcmp(client_command, "get") == 0){
-      //to-do
-      exit(0);
+      process_get(file_name, sd);
     }else if( strcmp(client_command, "put") == 0){
       //to-do
       exit(0);
     }else{
       printf("Undefined command\n");
       exit(0);
-    }
-
-    /*create child process to execute command received
-     *redirect standard output, standard error to socket
-     */
-    if((pid = fork()) == 0){
-
-      dup2(sd, STDOUT_FILENO);
-      dup2(sd, STDERR_FILENO);
-
-      char arg[256] = "/bin/";
-      strcat(arg, server_command);
-
-      execl(arg, server_command, (char *)0);
-      printf("the execl call failed.\n");
-
-      exit(1);
-    }else if ( pid < 0){
-      printf("Fork failed\n");
-      exit(1);
     }
 
     clean_up(cl);
@@ -146,6 +185,7 @@ void serve_a_client(int sd)
 
 int main(int argc, char *argv[])
 {
+  printf("SERVER VERSION 1.0\n");
   int sd, nsd, n;
   pid_t pid;
   unsigned short port;   // server listening port
@@ -166,7 +206,7 @@ int main(int argc, char *argv[])
     printf("Usage: %s [ server listening port ]\n", argv[0]);
     exit(1);
   }
-  
+
   /* turn the program into a daemon */
   daemon_init();
 
