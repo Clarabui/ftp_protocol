@@ -11,8 +11,8 @@ token.o: token.h token.c
 server.o: server.c 
 	gcc -c server.c
 
-client: stream.o client.o
-	gcc stream.o client.o -o cli
+client: stream.o token.o client.o
+	gcc stream.o token.o client.o -o cli
 
 client.o: client.c
 	gcc -c client.c

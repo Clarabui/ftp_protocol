@@ -14,18 +14,27 @@
 #include  <netdb.h>            /* struct hostent, gethostbyname() */
 #include  <string.h>
 #include  <errno.h>
+#include  "token.h"
 #include  "stream.h"           /* MAX_BLOCK_SIZE, readn(), writen() */
 
 #define   SERV_TCP_PORT  40005 /* default server listening port */
+
+void trim(char input[]) {
+  size_t len = strlen(input);
+  if((len > 0) && (input[len-1] == '\n')){
+    input[--len] = '\0';
+  }
+}
 
 int main(int argc, char *argv[])
 {
   int sd, n, nr, nw, i=0;
   extern int errno;
-  char buf[MAX_BLOCK_SIZE], host[60];
+  char buf[MAX_BLOCK_SIZE], buf1[MAX_BLOCK_SIZE], buf2[MAX_BLOCK_SIZE], host[60];
   unsigned short port;
   struct sockaddr_in ser_addr;
   struct hostent *hp;
+  char *command_array[MAX_NUM_TOKENS];
 
   /* get server host name and port number */
   if (argc==1) {  /* assume server running on the local host and on default port */
@@ -68,16 +77,13 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
+
   while (1) {
 
     printf("\nClient Input Command: ");
     fgets(buf, sizeof(buf), stdin);
     nr = strlen(buf);
-
-    if (buf[nr-1] == '\n'){
-      buf[nr-1] = '\0';
-      --nr;
-    }
+    trim(buf);
 
 
     if (strcmp(buf, "quit")==0) {
@@ -91,12 +97,36 @@ int main(int argc, char *argv[])
         exit(1);
       }
 
-      if ((nr=read(sd, buf, sizeof(buf))) <= 0) {
+
+      /* parse command line into command array*/
+      tokenise(buf, command_array);
+      char * client_command;
+      client_command = command_array[0];
+      printf("COMMAND: %s\n", client_command);
+
+      if(strcmp(client_command, "get") == 0){
+        if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+          printf("Client: receive error\n");
+          exit(1);
+        }
+
+        buf1[nr] = '\0';
+        printf("Server said: %s\n", buf1);
+
+        printf("Enter Y/N: ");
+        fgets(buf2, sizeof(buf2), stdin);
+        trim(buf2);
+        write(sd, buf2, strlen(buf2));
+
+        /* Downloading file*/
+      }
+
+      if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
         printf("Client: receive error\n");
         exit(1);
       }
-      buf[nr] = '\0';
-      printf("Server Output: %s\n", buf);
+      buf1[nr] = '\0';
+      printf("Server Output: %s\n", buf1);
     }
   }
 }

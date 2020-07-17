@@ -1,5 +1,7 @@
 *.o
 ser
 cli
+Logfile
 
 .idea
+*.doc

@@ -38,6 +38,12 @@ void claim_children()
   }
 }
 
+void trim(char input[]) {
+  size_t len = strlen(input);
+  if((len > 0) && (input[len-1] == '\n')){
+    input[--len] = '\0';
+  }
+}
 
 int daemon_init()
 {
@@ -123,7 +129,8 @@ void process_dir(char * server_command, int sd){
 void process_get(char * file_name, int sd){
   int fd;
   struct stat f_info;
-  char * msg;
+  char * msg1;
+  char msg2[MAX_BLOCK_SIZE];
 
   if( (fd = open(file_name, O_RDONLY)) == -1 ){
     printf("File does not exist\n");
@@ -134,9 +141,21 @@ void process_get(char * file_name, int sd){
     printf("lstat failed\n");
     exit(1);
   }
-  
-  msg = "File does exist and ready to download. Do you want to continue?(Y/N)";
-  write(sd, msg, strlen(msg));
+
+  sprintf(msg1, "File exists! File size: %lld bytes. Do you want to continue?(Y/N)", f_info.st_size);
+
+  write(sd, msg1, strlen(msg1));
+  printf("ERRORRRRRR\n");
+  read(sd, msg2, strlen(msg2));
+  trim(msg2);
+  printf("Received %s", msg2);
+
+  if(strcmp(msg2, "Y") == 0){
+    printf("\nStart sending file\n");
+  }else{
+    printf("\nDont send file\n");
+  }
+  exit(0);
 
 }
 
