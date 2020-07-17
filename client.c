@@ -13,6 +13,7 @@
 #include  <netinet/in.h>       /* struct sockaddr_in, htons, htonl */
 #include  <netdb.h>            /* struct hostent, gethostbyname() */
 #include  <string.h>
+#include  <errno.h>
 #include  "stream.h"           /* MAX_BLOCK_SIZE, readn(), writen() */
 
 #define   SERV_TCP_PORT  40005 /* default server listening port */
@@ -20,6 +21,7 @@
 int main(int argc, char *argv[])
 {
   int sd, n, nr, nw, i=0;
+  extern int errno;
   char buf[MAX_BLOCK_SIZE], host[60];
   unsigned short port;
   struct sockaddr_in ser_addr;
