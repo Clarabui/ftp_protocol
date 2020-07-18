@@ -5,3 +5,6 @@ Logfile
 
 .idea
 *.doc
+
+cmake-build-debug
+
