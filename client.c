@@ -86,7 +86,6 @@ int main(int argc, char *argv[])
     nr = strlen(buf);
     trim(buf);
 
-
     if (strcmp(buf, "quit")==0) {
       printf("Bye from client\n");
       exit(0);
@@ -98,8 +97,7 @@ int main(int argc, char *argv[])
         exit(1);
       }
 
-
-      /* parse command line into command array*/
+        /* parse command line into command array*/
       tokenise(buf, command_array);
       char * client_command;
       char * file_name;
@@ -107,8 +105,10 @@ int main(int argc, char *argv[])
       file_name = command_array[1];
       printf("COMMAND: %s\n", client_command);
 
-      /* implement get method */
+      /* implement cd command for client */
 
+
+      /* implement get method */
       if(strcmp(client_command, "get") == 0){
         if ((nr=read(sd, buf1, sizeof(buf1))) <= 0) {
           printf("Client: receive error\n");
@@ -142,8 +142,7 @@ int main(int argc, char *argv[])
             exit(1);
           }
         }
-
-      }
+      } // end of get
 
       if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
         printf("Client: receive error\n");
