@@ -127,7 +127,7 @@ void process_dir(char * server_command, int sd){
 }
 
 void process_get(char * file_name, int sd){
-  int fd;
+  int fd, nbytes, file_size;
   struct stat f_info;
   char msg1[200];
   char msg2[20];
@@ -144,8 +144,19 @@ void process_get(char * file_name, int sd){
     exit(1);
   }
 
-  sprintf(msg1, "File exists! File size: %lld bytes. Do you want to continue?(Y/N)", f_info.st_size);
-  write(sd, msg1, strlen(msg1));
+  //sprintf(msg1, "File exists! File size: %lld bytes. Do you want to continue?(Y/N)", f_info.st_size);
+  //write(sd, msg1, strlen(msg1));
+
+  file_size = f_info.st_size;
+  if (sizeof(file_size) == 2){
+    nbytes = htons(file_size);
+  }else{
+    nbytes = htonl(file_size);
+  }
+
+  printf("File size is %d\n", nbytes);
+
+  write(sd, &nbytes, sizeof(file_size));
 
   read(sd, msg2, sizeof(msg2));
 
@@ -155,18 +166,12 @@ void process_get(char * file_name, int sd){
     printf("\nStart sending file\n");
     int nr, nw;
 
-    printf("------DEBUG nc = %d\n", nr);
-    printf(":------DEBUD fd = %d\n", fd);
     while (1){
-      if ((nr = readn(fd, buf, sizeof(buf))) <= 0 ){
-        printf("------DEBUG nc = %d\n", nr);
-        printf("Read from file error\n");
-        exit(1);
+      if ((nr = read(fd, buf, sizeof(buf))) <= 0 ){
+        printf("Reach EOF\n");
+        break;
       }
-      
-      printf("------DEBUG nw = %d\n", nw);
-      if ((nw = writen(sd, buf, strlen(buf))) < 0){
-        printf("Write to socket error\n");
+      if ((nw = writen(sd, buf, nr)) < 0){
         exit(1);
       }
     }
@@ -175,9 +180,8 @@ void process_get(char * file_name, int sd){
     printf("\nDont send file\n");
     exit(0);
   }
-  close(fd);
-  exit(0);
 
+  close(fd);
 }
 
 void serve_a_client(int sd)
@@ -226,6 +230,7 @@ void serve_a_client(int sd)
       exit(0);
     }else if( strcmp(client_command, "get") == 0){
       process_get(file_name, sd);
+      printf("Finish get\n");
     }else if( strcmp(client_command, "put") == 0){
       //to-do
       exit(0);

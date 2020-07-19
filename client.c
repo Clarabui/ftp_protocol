@@ -110,40 +110,55 @@ int main(int argc, char *argv[])
       /* implement get method */
 
       if(strcmp(client_command, "get") == 0){
-        if ((nr=read(sd, buf1, sizeof(buf1))) <= 0) {
-          printf("Client: receive error\n");
-          exit(1);
+        /*if ((nr=read(sd, buf1, sizeof(buf1))) <= 0) {*/
+          /*printf("Client: receive error\n");*/
+          /*exit(1);*/
+        /*}*/
+
+        //buf1[nr] = '\0';
+        //printf("Server said: %s\n", buf1);
+        int nbytes, file_size;
+
+        read(sd, &nbytes, sizeof(nbytes));
+        if(sizeof(file_size) == 2){
+          file_size = ntohs(nbytes);
+        }else{
+          file_size = ntohl(nbytes);
         }
 
-        buf1[nr] = '\0';
-        printf("Server said: %s\n", buf1);
+        printf("File size is %d\n", file_size);
 
         printf("Enter Y/N: ");
         fgets(buf2, sizeof(buf2), stdin);
-        nr = strlen(buf2);
+        int nr2;
+        nr2 = strlen(buf2);
         trim(buf2);
-        write(sd, buf2, nr);
+        write(sd, buf2, nr2);
 
         /* Downloading file
          * Create file if it does not exist
          * */
-        int fd;
+        int fd, nr3, nw3, total_bytes;
         fd = open("foo", O_WRONLY|O_CREAT, 0766);
         char buf3[MAX_BLOCK_SIZE];
+        nr3 = 0;
 
         while(1){
-          if (( readn(sd, buf3, sizeof(buf3))) <= 0){
-            printf("Failed to read from socket\n");
-            exit(1);
-          }
+          nr3 = readn(sd, buf3, sizeof(buf3));
+          total_bytes += nr3;
+          if(total_bytes == file_size){
+              printf("Finish downloading\n");
+              break;
+            }
 
-          if (( writen(fd, buf3, strlen(buf3))) < 0){
+          printf("Read nr = %d\n", nr3);
+
+          if (( nw3 = write(fd, buf3, nr3)) < 0){
             printf("Failed to write to file\n");
             exit(1);
           }
         }
-
-      }
+      }else{
 
       if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
         printf("Client: receive error\n");
@@ -151,6 +166,7 @@ int main(int argc, char *argv[])
       }
       buf1[nr] = '\0';
       printf("Server Output: %s\n", buf1);
+    }
     }
   }
 }
