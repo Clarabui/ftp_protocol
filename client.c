@@ -86,7 +86,6 @@ int main(int argc, char *argv[])
     nr = strlen(buf);
     trim(buf);
 
-
     if (strcmp(buf, "quit")==0) {
       printf("Bye from client\n");
       exit(0);
