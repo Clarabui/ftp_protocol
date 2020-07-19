@@ -24,9 +24,9 @@
 #include  <sys/stat.h>
 #include  <fcntl.h>
 #include  <errno.h>
-
 #include  "stream.h"     /* MAX_BLOCK_SIZE, readn(), writen() */
 #include  "token.h"
+#include "server.h"
 
 #define   SERV_TCP_PORT   40005   /* default server listening port */
 
@@ -45,7 +45,7 @@ void trim(char input[]) {
   }
 }
 
-int daemon_init()
+int daemon_init(const char *cwd)
 {
   pid_t   pid;
   struct sigaction act;
@@ -54,23 +54,23 @@ int daemon_init()
     printf("fork failed\n");
     exit(1);
   } else if (pid > 0) {
-    printf("Daemon PID =  %d\n", pid);
-    exit(0);                  /* parent goes bye-bye */
+      printf("Daemon PID =  %d\n", pid);
+      /* Before parent goes bye bye; check if parent can
+       * handle chdir() process; if any */
+
+      exit(0); // parent bye-bye
   }
 
   /* child continues */
   setsid();                      /* become session leader */
-  //chdir(cwd);                  /* attach daemon process to current server directory, comment out the change working directory */
   umask(0);                      /* clear file mode creation mask */
 
   /* catch SIGCHLD to remove zombies from system */
   act.sa_handler = claim_children; /* use reliable signal */
   sigemptyset(&act.sa_mask);       /* not to block other signals */
-  act.sa_flags   = SA_NOCLDSTOP;   /* not catch stopped children */
+  act.sa_flags= SA_NOCLDSTOP;   /* not catch stopped children */
   sigaction(SIGCHLD,(struct sigaction *)&act,(struct sigaction *)0);
-  /* note: a less than perfect method is to use
-     signal(SIGCHLD, claim_children);
-     */
+
 
   return(0);
 }
@@ -126,6 +126,15 @@ void process_dir(char * server_command, int sd){
   }
 }
 
+void process_chdir(char * server_command, int sd) {
+    /*create child process to execute dir command received
+       *redirect standard output, standard error to socket
+       */
+    // TODO: need to get 2nd arg and exec chdir()
+
+
+}
+
 void process_get(char * file_name, int sd){
   int fd, nbytes, file_size;
   struct stat f_info;
@@ -139,7 +148,7 @@ void process_get(char * file_name, int sd){
     exit(1);
   }
 
-  if ( lstat(file_name, &f_info) < 0 ){
+  if ( lstat(file_name, &f_info) < 0 ) {
     printf("lstat failed\n");
     exit(1);
   }
@@ -178,7 +187,6 @@ void process_get(char * file_name, int sd){
 
   }else{
     printf("\nDont send file\n");
-    exit(0);
   }
 
   close(fd);
@@ -212,11 +220,9 @@ void serve_a_client(int sd)
     }
 
     /*map client_command to server_command*/
-    char * client_command;
-    char * server_command;
     char * file_name;
 
-    client_command = command_array[0];
+    client_command = command_array[0]; // TODO: use it from here
     file_name = command_array[1];
 
     if( strcmp(client_command, "pwd") == 0 ){
@@ -226,8 +232,11 @@ void serve_a_client(int sd)
       server_command = "ls";
       process_dir(server_command, sd);
     }else if( strcmp(client_command, "cd") == 0){
-      //to-do
-      exit(0);
+      server_command = "cd";
+      process_chdir(server_command, sd);
+    }else if( strcmp(client_command, "lcd") == 0){
+        server_command = "lcd";
+        process_chdir(server_command, sd);
     }else if( strcmp(client_command, "get") == 0){
       process_get(file_name, sd);
       printf("Finish get\n");
@@ -236,7 +245,7 @@ void serve_a_client(int sd)
       exit(0);
     }else{
       printf("Undefined command\n");
-        exit(0);
+      exit(0);
     }
 
     printf("Waiting for next command....\n\n");
@@ -252,24 +261,18 @@ int main(int argc, char *argv[])
   FILE * log;
   char * logfilename = "Logfile";
 
-  unsigned short port;   // server listening port
+  unsigned long port;   // server listening port
   socklen_t cli_addrlen;
   struct sockaddr_in ser_addr, cli_addr;
   /* get the port number */
-  if (argc == 1) {
-    port = SERV_TCP_PORT;
-  } else if (argc == 2) {
-    int n = atoi(argv[1]);
-    if (n >= 1024 && n < 65536)
-      port = n;
-    else {
-      printf("Error: port number must be between 1024 and 65535\n");
-      exit(1);
-    }
+  port = SERV_TCP_PORT;
+  if (port >= 1024 && port < 65536) {
+    printf("Usage: %lu [ server listening port ]\n", port);
   } else {
-    printf("Usage: %s [ server listening port ]\n", argv[0]);
+    printf("Error: port number must be between 1024 and 65535\n");
     exit(1);
   }
+
   /* create log file */
   log = fopen(logfilename, "w");
   if (log == NULL){
@@ -277,8 +280,16 @@ int main(int argc, char *argv[])
     exit(3);
   }
 
+  if ( argv[1] != NULL ) {
+    strcpy(cwd_userArg, argv[1]);
+    if (chdir(cwd_userArg) < 0) {
+        fprintf(log, "Can't set to directory, ERROR\n");
+    }
+    printf("Arg passed is: %s\n", cwd_userArg);
+  }
+
   /* turn the program into a daemon */
-  if (daemon_init() == -1){
+  if (daemon_init(cwd_userArg) == -1){
     printf("ERROR: Can't become a daemon\n");
     exit(4);
   }
@@ -288,7 +299,7 @@ int main(int argc, char *argv[])
 
   /* set up listening socket sd */
   if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    fprintf(log, "server:socket");
+    fprintf(log, "setup for listening socket ERROR");
     exit(1);
   }
 
@@ -303,7 +314,7 @@ int main(int argc, char *argv[])
 
   /* bind server address to socket sd */
   if (bind(sd, (struct sockaddr *) &ser_addr, sizeof(ser_addr))<0){
-    fprintf(log,"server bind");
+    fprintf(log,"server bind ERROR");
     exit(1);
   }
 
@@ -334,7 +345,7 @@ int main(int argc, char *argv[])
     /* now in child, serve the current client */
     close(sd);
 
-    /*refirect output of child prgram output to socket*/
+    /*redirect output of child program output to socket*/
     serve_a_client(nsd);
     exit(0);
   }
