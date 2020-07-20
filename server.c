@@ -54,11 +54,11 @@ int daemon_init(const char *cwd)
     printf("fork failed\n");
     exit(1);
   } else if (pid > 0) {
-      printf("Daemon PID =  %d\n", pid);
-      /* Before parent goes bye bye; check if parent can
-       * handle chdir() process; if any */
+    printf("Daemon PID =  %d\n", pid);
+    /* Before parent goes bye bye; check if parent can
+     * handle chdir() process; if any */
 
-      exit(0); // parent bye-bye
+    exit(0); // parent bye-bye
   }
 
   /* child continues */
@@ -138,56 +138,45 @@ void process_chdir(char * path, int sd) {
   write(sd, msg, strlen(msg));
 }
 
-int convert_to_NBO(int n, int nn){
-  if (sizeof(n) == 2){
-    nn = htons(n);
-  }else{
-    nn = htonl(n);
+int convert_to_NBO(int n) {
+  if (sizeof(n) == 2) {
+    return  htons(n);
+  } else {
+    return  htonl(n);
   }
-  return nn;
 }
+
 void process_get(char * file_name, int sd){
-  int fd, nbytes, file_size, ERROR_CODE;
+  int fd, nbytes, file_size, error_code = 0;
   struct stat f_info;
   char msg1[200];
   char msg2[20];
   char buf[MAX_BLOCK_SIZE];
 
-
-  /*if( (fd = open(file_name, O_RDONLY)) == -1 ){*/
-  /* Send ERROR CODE from server to client
-   * Covert ERROR CODE to Network Byte Order and send to client
-   */
-  /*printf("File does not exist\n");*/
-  /*exit(1);*/
-  /*}*/
-
-
   if ( lstat(file_name, &f_info) < 0 ) {
     printf("File does not exist\n");
-    ERROR_CODE = -1;
-  }
-
-  if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
+    error_code = -1;
+  } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
     printf("No read permission\n");
-    ERROR_CODE = -2;
+    error_code = -2;
   }
 
   /* Convert file size OR error code  to Network Byte Order and send to client*/
 
-  if(ERROR_CODE){
-    convert_to_NBO(ERROR_CODE, nbytes);
-    write(sd, &nbytes, sizeof(ERROR_CODE));
-  }else{
+  if (error_code != 0){
+    nbytes = convert_to_NBO(error_code);
+    write(sd, &nbytes, sizeof(error_code));
+    return;
+  } else {
     file_size = f_info.st_size;
-    convert_to_NBO(file_size, nbytes);
-    write(sd, &nbytes, sizeof(file_size));
+    nbytes = convert_to_NBO(file_size);
+
+    write(sd, &nbytes, sizeof(nbytes));
   }
 
   /* Read client confirmation to download file (Y/N)*/
   read(sd, msg2, sizeof(msg2));
   printf("Client confirm to download file? '%s'", msg2);
-
 
   /* Client confirm to download file with Y
    * Read file from open file descriptor fd to buf and write data from buf to socket
@@ -196,22 +185,25 @@ void process_get(char * file_name, int sd){
   if( strcmp(msg2, "Y") == 0){
     printf("\nStart sending file\n");
     int nr, nw;
+    fd = open(file_name, O_RDONLY);
 
     while (1){
       if ((nr = read(fd, buf, sizeof(buf))) <= 0 ){
         printf("Reach EOF\n");
         break;
       }
+
+      printf("--DEBUG---read bytes: %d\n", nr);
+
       if ((nw = writen(sd, buf, nr)) < 0){
         exit(1);
       }
     }
 
-  }else{
+    close(fd);
+  } else {
     printf("\nDont send file\n");
   }
-
-  close(fd);
 }
 
 void serve_a_client(int sd)
