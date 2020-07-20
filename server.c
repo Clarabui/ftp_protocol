@@ -126,13 +126,16 @@ void process_dir(char * server_command, int sd){
   }
 }
 
-void process_chdir(char * server_command, int sd) {
-    /*create child process to execute dir command received
-       *redirect standard output, standard error to socket
-       */
-    // TODO: need to get 2nd arg and exec chdir()
+void process_chdir(char * path, int sd) {
+  int pid;
 
-
+  char * msg;
+  if( chdir(path) !=0){
+    msg = "Unsuccesfully change directory";
+  }else{
+    msg = "Successfully change directory";
+  }
+  write(sd, msg, strlen(msg));
 }
 
 int convert_to_NBO(int n, int nn){
@@ -152,14 +155,13 @@ void process_get(char * file_name, int sd){
 
 
   /*if( (fd = open(file_name, O_RDONLY)) == -1 ){*/
-    /* Send ERROR CODE from server to client
-     * Covert ERROR CODE to Network Byte Order and send to client
-     */
-    /*printf("File does not exist\n");*/
-    /*exit(1);*/
+  /* Send ERROR CODE from server to client
+   * Covert ERROR CODE to Network Byte Order and send to client
+   */
+  /*printf("File does not exist\n");*/
+  /*exit(1);*/
   /*}*/
 
-  /*printf("File desciptor %d\n", fd);*/
 
   if ( lstat(file_name, &f_info) < 0 ) {
     printf("File does not exist\n");
@@ -240,10 +242,11 @@ void serve_a_client(int sd)
     }
 
     /*map client_command to server_command*/
-    char * file_name;
+    char * file_name, *path;
 
     client_command = command_array[0];
     file_name = command_array[1];
+    path = command_array[1];
 
     if( strcmp(client_command, "pwd") == 0 ){
       server_command = "pwd";
@@ -252,11 +255,7 @@ void serve_a_client(int sd)
       server_command = "ls";
       process_dir(server_command, sd);
     }else if( strcmp(client_command, "cd") == 0){
-      server_command = "cd";
-      process_chdir(server_command, sd);
-    }else if( strcmp(client_command, "lcd") == 0){
-        server_command = "lcd";
-        process_chdir(server_command, sd);
+      process_chdir(path, sd);
     }else if( strcmp(client_command, "get") == 0){
       process_get(file_name, sd);
     }else if( strcmp(client_command, "put") == 0){
@@ -302,7 +301,7 @@ int main(int argc, char *argv[])
   if ( argv[1] != NULL ) {
     strcpy(cwd_userArg, argv[1]);
     if (chdir(cwd_userArg) < 0) {
-        fprintf(log, "Can't set to directory, ERROR\n");
+      fprintf(log, "Can't set to directory, ERROR\n");
     }
     printf("Arg passed is: %s\n", cwd_userArg);
   }

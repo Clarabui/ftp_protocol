@@ -58,17 +58,11 @@ void process_ldir(){
 }
 
 void process_lcd(char * path){
-  int pid;
 
-  if((pid = fork()) == 0){
     if (chdir(path) != 0){
       printf("chdir failed\n");
       exit(1);
     }
-  }else if (pid < 0){
-    printf("Fork failed\n");
-    exit(1);
-  }
 }
 
 void process_get(char * filename, int sd){
@@ -127,7 +121,7 @@ int main(int argc, char *argv[])
 {
   int sd, n, nr, nw, i=0;
   extern int errno;
-  char buf[MAX_BLOCK_SIZE], buf1[MAX_BLOCK_SIZE], buf2[MAX_BLOCK_SIZE], host[60];
+  char buf[MAX_BLOCK_SIZE], input[MAX_BLOCK_SIZE], buf1[MAX_BLOCK_SIZE], buf2[MAX_BLOCK_SIZE], host[60];
   unsigned short port;
   struct sockaddr_in ser_addr;
   struct hostent *hp;
@@ -181,14 +175,16 @@ int main(int argc, char *argv[])
     fgets(buf, sizeof(buf), stdin);
     nr = strlen(buf);
     trim(buf);
-
+    memcpy(input, buf, sizeof(buf));
+    
     /* parse command line into command array*/
-    tokenise(buf, command_array);
+    tokenise(input, command_array);
     char * client_command;
     char * argument;
     client_command = command_array[0];
     argument = command_array[1];
     printf("COMMAND: %s\n", client_command);
+    printf("ARGUMENT: %s\n", argument);
 
     if (strcmp(client_command, "quit")==0) {
       printf("Bye from client\n");
@@ -206,6 +202,7 @@ int main(int argc, char *argv[])
 
       /* handle command sent to server*/
       if (nr > 0) {
+        printf("Sending to socket %s\n", buf);
         if ((nw=write(sd, buf, nr)) < nr) {
           printf("Client: send error\n");
           exit(1);
@@ -217,7 +214,13 @@ int main(int argc, char *argv[])
         }else if(strcmp(client_command, "put") == 0){
           //TO DO
         }else if (strcmp(client_command, "cd") == 0){
-          //TO DO
+          if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+            printf("Client: receive error\n");
+            exit(1);
+          }
+          buf1[nr] = '\0';
+          printf("---------Server Output-----------\n%s\n", buf1);
+
         }else if (strcmp(client_command, "pwd") == 0 || strcmp(client_command, "dir") == 0){
           if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
             printf("Client: receive error\n");
