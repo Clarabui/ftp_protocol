@@ -45,7 +45,7 @@ void trim(char input[]) {
   }
 }
 
-int daemon_init()
+int daemon_init(const char *cwd)
 {
   pid_t   pid;
   struct sigaction act;
@@ -75,7 +75,7 @@ int daemon_init()
   return(0);
 }
 
-void process_pwd(int sd){
+void process_pwd(char * server_command, int sd){
 
   /*create child process to execute pwd received
    *redirect standard output, standard error to socket
@@ -101,7 +101,7 @@ void process_pwd(int sd){
 }
 
 
-void process_dir(int sd){
+void process_dir(char * server_command, int sd){
 
   /*create child process to execute dir command received
    *redirect standard output, standard error to socket
@@ -126,45 +126,17 @@ void process_dir(int sd){
   }
 }
 
-void process_chdir_server(int sd) {
-    /* create child process to execute dir command received
-     * redirect standard output, standard error to socket
-     * use pipe to pass to parent process to chdir
-     */
-    int pid, nbytes;
-    int pipefd[2];
-    pipe(pipefd);
-    char buf[MAX_BLOCK_SIZE];
+void process_chdir(char * path, int sd) {
+  int pid;
 
-    pid = fork();
-    if (pid<0)
-    {
-        printf("\n Error");
-        exit(1);
-    }
-    else if (pid==0)
-    {
-        dup2(sd, STDOUT_FILENO);
-        dup2(sd, STDERR_FILENO);
-
-        printf("Change Dir: %s\n", chdir_cmdargs);
-        close(pipefd[0]);
-        write(pipefd[1], chdir_cmdargs, strlen(chdir_cmdargs)+1);
-        close(pipefd[1]);
-
-    }
-    else if (pid > 0) {
-        close(pipefd[1]);
-        // TODO: must read in from pipefd[0] and use that value in chdir();
-//        read(pipefd[0], buf, sizeof(chdir_cmdargs));
-        close(pipefd[0]);
-        chdir(chdir_cmdargs);
-        write(STDOUT_FILENO, "\n", 1);
-        wait((int *)NULL);
-    }
-
+  char * msg;
+  if( chdir(path) !=0){
+    msg = "Unsuccesfully change directory";
+  }else{
+    msg = "Successfully change directory";
+  }
+  write(sd, msg, strlen(msg));
 }
-
 
 int convert_to_NBO(int n, int nn){
   if (sizeof(n) == 2){
@@ -183,14 +155,13 @@ void process_get(char * file_name, int sd){
 
 
   /*if( (fd = open(file_name, O_RDONLY)) == -1 ){*/
-    /* Send ERROR CODE from server to client
-     * Covert ERROR CODE to Network Byte Order and send to client
-     */
-    /*printf("File does not exist\n");*/
-    /*exit(1);*/
+  /* Send ERROR CODE from server to client
+   * Covert ERROR CODE to Network Byte Order and send to client
+   */
+  /*printf("File does not exist\n");*/
+  /*exit(1);*/
   /*}*/
 
-  /*printf("File desciptor %d\n", fd);*/
 
   if ( lstat(file_name, &f_info) < 0 ) {
     printf("File does not exist\n");
@@ -271,28 +242,26 @@ void serve_a_client(int sd)
     }
 
     /*map client_command to server_command*/
-    char * file_name;
+    char * file_name, *path;
 
     client_command = command_array[0];
     file_name = command_array[1];
+    path = command_array[1];
 
     if( strcmp(client_command, "pwd") == 0 ){
       server_command = "pwd";
-      process_pwd(sd);
+      process_pwd(server_command, sd);
     }else if( strcmp(client_command, "dir") == 0){
       server_command = "ls";
-      process_dir(sd);
+      process_dir(server_command, sd);
     }else if( strcmp(client_command, "cd") == 0){
-      server_command = "cd";
-      chdir_cmdargs = command_array[1];
-      process_chdir_server(sd);
+      process_chdir(path, sd);
     }else if( strcmp(client_command, "get") == 0){
-      file_name = command_array[1];
       process_get(file_name, sd);
     }else if( strcmp(client_command, "put") == 0){
       //to-do
       exit(0);
-    }else {
+    }else{
       printf("Undefined command\n");
       exit(0);
     }
@@ -307,6 +276,7 @@ int main(int argc, char *argv[])
   int sd, nsd, n;
   extern int errno;
   pid_t pid;
+  FILE * log;
   char * logfilename = "Logfile";
 
   unsigned long port;   // server listening port
@@ -321,33 +291,33 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  /* create logFile file */
-  logFile = fopen(logfilename, "w");
-  if (logFile == NULL){
-    printf("ERROR: Can't create a logFile file\n");
+  /* create log file */
+  log = fopen(logfilename, "w");
+  if (log == NULL){
+    printf("ERROR: Can't create a log file\n");
     exit(3);
   }
 
   if ( argv[1] != NULL ) {
     strcpy(cwd_userArg, argv[1]);
     if (chdir(cwd_userArg) < 0) {
-        fprintf(logFile, "Can't set to directory, ERROR\n");
+      fprintf(log, "Can't set to directory, ERROR\n");
     }
     printf("Arg passed is: %s\n", cwd_userArg);
   }
 
   /* turn the program into a daemon */
-  if (daemon_init() == -1){
+  if (daemon_init(cwd_userArg) == -1){
     printf("ERROR: Can't become a daemon\n");
     exit(4);
   }
 
-  fprintf(logFile, "Server pid = %d\n", getpid());
-  fflush(logFile);
+  fprintf(log, "Server pid = %d\n", getpid());
+  fflush(log);
 
   /* set up listening socket sd */
   if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    fprintf(logFile, "setup for listening socket ERROR");
+    fprintf(log, "setup for listening socket ERROR");
     exit(1);
   }
 
@@ -362,7 +332,7 @@ int main(int argc, char *argv[])
 
   /* bind server address to socket sd */
   if (bind(sd, (struct sockaddr *) &ser_addr, sizeof(ser_addr))<0){
-    fprintf(logFile,"server bind ERROR");
+    fprintf(log,"server bind ERROR");
     exit(1);
   }
 
@@ -377,7 +347,7 @@ int main(int argc, char *argv[])
     if (nsd < 0) {
       if (errno == EINTR)   /* if interrupted by SIGCHLD */
         continue;
-      fprintf(logFile,"server:accept");
+      fprintf(log,"server:accept"); 
       exit(1);
     }
 
