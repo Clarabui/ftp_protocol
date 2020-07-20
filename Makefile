@@ -14,7 +14,7 @@ server.o: server.c server.h
 client: stream.o token.o client.o
 	gcc stream.o token.o client.o -o myftp
 
-client.o: client.c
+client.o: client.c client.h
 	gcc -c client.c
 
 clean:

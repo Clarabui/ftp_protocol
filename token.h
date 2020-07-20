@@ -1,8 +1,7 @@
-/*
- * file:    token.h
- * author:  Tram
- * aim:     implements tokenise function
- * date:    2020.07.03
+/**
+ * @file    token.h
+ * @authors  Tram, Navin
+ * @details implements tokenise function
  */
 
 #define MAX_NUM_TOKENS 4

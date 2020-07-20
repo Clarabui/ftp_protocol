@@ -1,13 +1,10 @@
-/*
- *  ser6.c  - 	(Topic 11, HX 22/5/1995)
- *		An improved version of "ser5.c". This version handles the message boundaries
- *              which are not preserved by the TCP. Each message transmitted between the
- *              client and the server is preceeded by a two byte value which is the length
- *              of the message. The handling of the message length is done in routines readn
- *              and writen.
- *  revised:	22/05/1996
- *  revised:	18/10/2006
- */
+/**
+ * @authors Tram, Navin
+ * @file server.c
+ * @details Server application source file
+ *
+ * */
+
 
 #include  <stdlib.h>     /* strlen(), strcmp() etc */
 #include  <stdio.h>      /* printf()  */
@@ -45,7 +42,7 @@ void trim(char input[]) {
   }
 }
 
-int daemon_init(const char *cwd)
+int daemon_init()
 {
   pid_t   pid;
   struct sigaction act;
@@ -55,15 +52,12 @@ int daemon_init(const char *cwd)
     exit(1);
   } else if (pid > 0) {
       printf("Daemon PID =  %d\n", pid);
-      /* Before parent goes bye bye; check if parent can
-       * handle chdir() process; if any */
-
       exit(0); // parent bye-bye
   }
 
   /* child continues */
-  setsid();                      /* become session leader */
-  umask(0);                      /* clear file mode creation mask */
+  setsid(); /* become session leader */
+  umask(0); /* clear file mode creation mask */
 
   /* catch SIGCHLD to remove zombies from system */
   act.sa_handler = claim_children; /* use reliable signal */
@@ -75,7 +69,7 @@ int daemon_init(const char *cwd)
   return(0);
 }
 
-void process_pwd(char * server_command, int sd){
+void process_pwd(int sd){
 
   /*create child process to execute pwd received
    *redirect standard output, standard error to socket
@@ -101,7 +95,7 @@ void process_pwd(char * server_command, int sd){
 }
 
 
-void process_dir(char * server_command, int sd){
+void process_dir(int sd){
 
   /*create child process to execute dir command received
    *redirect standard output, standard error to socket
@@ -127,11 +121,9 @@ void process_dir(char * server_command, int sd){
 }
 
 void process_chdir(char * path, int sd) {
-  int pid;
-
   char * msg;
   if( chdir(path) !=0){
-    msg = "Unsuccesfully change directory";
+    msg = "Unsuccessfully change directory";
   }else{
     msg = "Successfully change directory";
   }
@@ -161,7 +153,6 @@ void process_get(char * file_name, int sd){
   /*printf("File does not exist\n");*/
   /*exit(1);*/
   /*}*/
-
 
   if ( lstat(file_name, &f_info) < 0 ) {
     printf("File does not exist\n");
@@ -216,7 +207,7 @@ void process_get(char * file_name, int sd){
 
 void serve_a_client(int sd)
 {
-  int nr, nw;
+  int nr;
   char buf[MAX_BLOCK_SIZE];
   char *command_array[MAX_NUM_TOKENS];
   int tk_num;
@@ -241,7 +232,7 @@ void serve_a_client(int sd)
       printf("Command array size is too small\n");
     }
 
-    /*map client_command to server_command*/
+    /* map client_command to server_command */
     char * file_name, *path;
 
     client_command = command_array[0];
@@ -250,10 +241,10 @@ void serve_a_client(int sd)
 
     if( strcmp(client_command, "pwd") == 0 ){
       server_command = "pwd";
-      process_pwd(server_command, sd);
+      process_pwd(sd);
     }else if( strcmp(client_command, "dir") == 0){
       server_command = "ls";
-      process_dir(server_command, sd);
+      process_dir(sd);
     }else if( strcmp(client_command, "cd") == 0){
       process_chdir(path, sd);
     }else if( strcmp(client_command, "get") == 0){
@@ -273,13 +264,11 @@ void serve_a_client(int sd)
 
 int main(int argc, char *argv[])
 {
-  int sd, nsd, n;
-  extern int errno;
+  int sd, nsd;
   pid_t pid;
-  FILE * log;
-  char * logfilename = "Logfile";
+  char * logfilename = "serverLog";
 
-  unsigned long port;   // server listening port
+
   socklen_t cli_addrlen;
   struct sockaddr_in ser_addr, cli_addr;
   /* get the port number */
@@ -292,8 +281,8 @@ int main(int argc, char *argv[])
   }
 
   /* create log file */
-  log = fopen(logfilename, "w");
-  if (log == NULL){
+  logFile = fopen(logfilename, "w");
+  if (logFile == NULL){
     printf("ERROR: Can't create a log file\n");
     exit(3);
   }
@@ -301,23 +290,23 @@ int main(int argc, char *argv[])
   if ( argv[1] != NULL ) {
     strcpy(cwd_userArg, argv[1]);
     if (chdir(cwd_userArg) < 0) {
-      fprintf(log, "Can't set to directory, ERROR\n");
+      fprintf(logFile, "Can't set to directory, ERROR\n");
     }
     printf("Arg passed is: %s\n", cwd_userArg);
   }
 
   /* turn the program into a daemon */
-  if (daemon_init(cwd_userArg) == -1){
+  if (daemon_init() == -1){
     printf("ERROR: Can't become a daemon\n");
     exit(4);
   }
 
-  fprintf(log, "Server pid = %d\n", getpid());
-  fflush(log);
+  fprintf(logFile, "Server pid = %d\n", getpid());
+  fflush(logFile);
 
   /* set up listening socket sd */
   if ((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    fprintf(log, "setup for listening socket ERROR");
+    fprintf(logFile, "setup for listening socket ERROR");
     exit(1);
   }
 
@@ -332,7 +321,7 @@ int main(int argc, char *argv[])
 
   /* bind server address to socket sd */
   if (bind(sd, (struct sockaddr *) &ser_addr, sizeof(ser_addr))<0){
-    fprintf(log,"server bind ERROR");
+    fprintf(logFile,"server bind ERROR");
     exit(1);
   }
 
@@ -340,14 +329,13 @@ int main(int argc, char *argv[])
   listen(sd, 5);
 
   while (1) {
-
     /* wait to accept a client request for connection */
     cli_addrlen = sizeof(cli_addr);
     nsd = accept(sd, (struct sockaddr *) &cli_addr, &cli_addrlen);
     if (nsd < 0) {
       if (errno == EINTR)   /* if interrupted by SIGCHLD */
         continue;
-      fprintf(log,"server:accept"); 
+      fprintf(logFile,"server:accept");
       exit(1);
     }
 

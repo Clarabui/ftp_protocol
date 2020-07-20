@@ -1,22 +1,29 @@
-/* cli6.c - 	(Topic 11, HX 22/5/1995)
- *		An improved version of "cli5.c". Since TCP does not preserve the message
- *              boundaries, each message is preceeded by a two byte value which is the
- *              length of the message.
- * Revised;	06/11/2007
- */
+/**
+ * @authors Tram, Navin
+ * @file client.c
+ * @details Client application source file
+ *
+ * */
 
-#include  <stdlib.h>
+#include  <stdlib.h>     /* strlen(), strcmp() etc */
+#include  <stdio.h>      /* printf()  */
+#include  <string.h>     /* strlen(), strcmp() etc */
+#include  <errno.h>      /* extern int errno, EINTR, perror() */
+#include  <signal.h>     /* SIGCHLD, sigaction() */
+#include  <syslog.h>
+#include  <sys/types.h>  /* pid_t, u_long, u_short */
+#include  <sys/socket.h> /* struct sockaddr, socket(), etc */
+#include  <sys/wait.h>   /* waitpid(), WNOHAND */
+#include  <netinet/in.h> /* struct sockaddr_in, htons(), htonl(), */
+#include <netdb.h>
+/* and INADDR_ANY */
 #include  <unistd.h>
-#include  <stdio.h>
-#include  <sys/types.h>
-#include  <sys/socket.h>
-#include  <netinet/in.h>       /* struct sockaddr_in, htons, htonl */
-#include  <netdb.h>            /* struct hostent, gethostbyname() */
-#include  <string.h>
-#include  <errno.h>
+#include  <sys/stat.h>
 #include  <fcntl.h>
+#include  <errno.h>
+#include  "stream.h"     /* MAX_BLOCK_SIZE, readn(), writen() */
 #include  "token.h"
-#include  "stream.h"           /* MAX_BLOCK_SIZE, readn(), writen() */
+#include "client.h"
 
 #define   SERV_TCP_PORT  40005 /* default server listening port */
 
@@ -58,9 +65,10 @@ void process_ldir(){
 }
 
 void process_lcd(char * path){
-
+    // if chdir() doesn't return 0
+    // process exits with error
     if (chdir(path) != 0){
-      printf("chdir failed\n");
+      printf("chdir() failed to execute\n");
       exit(1);
     }
 }
@@ -119,13 +127,14 @@ void process_get(char * filename, int sd){
 
 int main(int argc, char *argv[])
 {
+
   int sd, n, nr, nw, i=0;
-  extern int errno;
-  char buf[MAX_BLOCK_SIZE], input[MAX_BLOCK_SIZE], buf1[MAX_BLOCK_SIZE], buf2[MAX_BLOCK_SIZE], host[60];
-  unsigned short port;
-  struct sockaddr_in ser_addr;
-  struct hostent *hp;
-  char *command_array[MAX_NUM_TOKENS];
+  char buf[MAX_BLOCK_SIZE],
+        input[MAX_BLOCK_SIZE],
+        buf1[MAX_BLOCK_SIZE],
+        buf2[MAX_BLOCK_SIZE],
+        host[60];
+
 
   /* get server host name and port number */
   if (argc==1) {  /* assume server running on the local host and on default port */
@@ -155,7 +164,7 @@ int main(int argc, char *argv[])
   ser_addr.sin_port = htons(port);
 
   if ((hp = gethostbyname(host)) == NULL){
-    printf("host %s not found\n", host);
+    printf("host not found; ERROR\n");
     exit(1);
   }
 
@@ -168,7 +177,7 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  printf("VERSION 1.1\n");
+  printf("VERSION 1.1 CLIENT\n");
   while (1) {
 
     printf("\nClient Input Command: ");

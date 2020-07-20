@@ -4,7 +4,6 @@
  */
 
 #include  <sys/types.h>
-#include  <netinet/in.h> /* struct sockaddr_in, htons(), htonl(), */
 #include  "stream.h"
 #include  <unistd.h>
 

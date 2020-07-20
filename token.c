@@ -1,9 +1,3 @@
-/* file:     token.c
- * aim:      implement a token
- * author:   Tram Bui
- * date:     2020.07.03
- */
-
 #include<string.h>
 #include "token.h"
 

@@ -1,6 +1,7 @@
-/*
- *  stream.h  - Topic 11, HX 22/5/1995)
- *	 	head file for stream read and stream write.
+/**
+ * @authors Tram, Navin
+ * @file stream.h
+ * @details header file for stream read and stream write.
  */
 
 
