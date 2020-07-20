@@ -165,44 +165,6 @@ void process_chdir_server(int sd) {
 
 }
 
-void process_chdir_client(int sd) {
-    /* create child process to execute dir command received
-     * redirect standard output, standard error to socket
-     * use pipe to pass to parent process to chdir
-     */
-    int pid, nbytes;
-    int pipefd[2];
-    pipe(pipefd);
-    char buf[MAX_BLOCK_SIZE];
-
-    pid = fork();
-    if (pid<0)
-    {
-        printf("\n Error");
-        exit(1);
-    }
-    else if (pid==0)
-    {
-        dup2(sd, STDOUT_FILENO);
-        dup2(sd, STDERR_FILENO);
-
-        printf("Change Dir: %s\n", chdir_cmdargs);
-        close(pipefd[0]);
-        write(pipefd[1], chdir_cmdargs, strlen(chdir_cmdargs)+1);
-        close(pipefd[1]);
-
-    }
-    else if (pid > 0) {
-        close(pipefd[0]);
-        // TODO: must read in from pipefd[0] and use that value in chdir();
-//        read(pipefd[0], buf, sizeof(chdir_cmdargs));
-        close(pipefd[1]);
-        chdir(chdir_cmdargs);
-        write(STDOUT_FILENO, "\n", 1);
-        wait((int *)NULL);
-    }
-
-}
 
 int convert_to_NBO(int n, int nn){
   if (sizeof(n) == 2){
@@ -320,9 +282,6 @@ void serve_a_client(int sd)
     }else if( strcmp(client_command, "dir") == 0){
       server_command = "ls";
       process_dir(sd);
-    }else if( strcmp(client_command, "ldir") == 0){
-        server_command = "ls";
-        process_dir(sd);
     }else if( strcmp(client_command, "cd") == 0){
       server_command = "cd";
       chdir_cmdargs = command_array[1];
