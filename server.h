@@ -52,7 +52,7 @@ void process_chdir(char * path, int sd);
 /*
  * Purpose:
  * */
-int convert_to_NBO(int n, int nn);
+int convert_to_NBO(int n);
 /*
  * Purpose:
  *  Download file given from path, from the process

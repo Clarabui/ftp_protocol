@@ -1,5 +1,6 @@
 *.o
-ser
+myftp
+myftpd
 cli
 Logfile
 
@@ -7,4 +8,3 @@ Logfile
 *.doc
 
 cmake-build-debug
-

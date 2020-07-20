@@ -73,19 +73,31 @@ void process_lcd(char * path){
     }
 }
 
+int convert_from_NBO(int n){
+  if(sizeof(n) == 2){
+    return ntohs(n);
+  }else{
+    return ntohl(n);
+  }
+}
+
 void process_get(char * filename, int sd){
 
   /* Receive Network Byte Order int from server and convert it to file size */
-  int nbytes, file_size, nr2;
+  int nbytes, file_size_or_error_code, file_size, nr2;
   char buf2[20];
 
   read(sd, &nbytes, sizeof(nbytes));
-  if(sizeof(file_size) == 2){
-    file_size = ntohs(nbytes);
-  }else{
-    file_size = ntohl(nbytes);
+  file_size_or_error_code = convert_from_NBO(nbytes);
+
+  if (file_size_or_error_code < 0) {
+    printf("Error %d\n", file_size_or_error_code);
+    return;
+  } else {
+    file_size = file_size_or_error_code;
   }
 
+  /* Check if nbytes < 0, print error code. Else, print file size*/
   printf("File size is %d\n", file_size);
 
   printf("Do you want to download file? Enter Y/N: ");
@@ -96,22 +108,31 @@ void process_get(char * filename, int sd){
   write(sd, buf2, nr2);
 
   if(strcmp(buf2, "Y") == 0){
+    printf("OPEN FILE\n");
     /* Downloading file
      * Create file if it does not exist
      */
     int fd, nr3, nw3, total_bytes;
-    fd = open("foo", O_WRONLY|O_CREAT, 0766); //replcae = filename later
+
+    char f_download[100];       /*construct download filename with prefix get_filenam*/
+    strcpy(f_download, "get_");
+    strcat(f_download, filename);
+
+    fd = open(f_download, O_WRONLY|O_CREAT, 0766); //replace = filename later
     char buf3[MAX_BLOCK_SIZE];
-    nr3 = 0;
+    total_bytes = 0;
 
     while(1){
       /* Read file from socket
        * If total bytes read equals to file size, exit while loop
        */
       nr3 = readn(sd, buf3, sizeof(buf3));
+      printf("Bytes read: %d\n", nr3);
       total_bytes += nr3;
       if(total_bytes == file_size){
         printf("Finish downloading\n");
+        write(fd, buf3, nr3);
+        file_size = 0;
         break;
       }
 
@@ -119,9 +140,11 @@ void process_get(char * filename, int sd){
 
       if (( nw3 = write(fd, buf3, nr3)) < 0){
         printf("Failed to write to file\n");
+        close(fd); //close file if cannot write to file
         exit(1);
       }
     }
+    close(fd);
   }
 }
 
@@ -185,7 +208,7 @@ int main(int argc, char *argv[])
     nr = strlen(buf);
     trim(buf);
     memcpy(input, buf, sizeof(buf));
-    
+ 
     /* parse command line into command array*/
     tokenise(input, command_array);
     char * client_command;
@@ -211,7 +234,7 @@ int main(int argc, char *argv[])
 
       /* handle command sent to server*/
       if (nr > 0) {
-        printf("Sending to socket %s\n", buf);
+        printf("Sending to socket: %s\n", buf);
         if ((nw=write(sd, buf, nr)) < nr) {
           printf("Client: send error\n");
           exit(1);
