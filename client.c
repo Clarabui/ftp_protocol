@@ -27,6 +27,102 @@ void trim(char input[]) {
   }
 }
 
+void process_lpwd(){
+  int pid;
+
+  if((pid =fork()) == 0){
+
+    execl("/bin/pwd", "pwd", (char *)0);
+    printf("the execl call failed\n");
+    exit(1);
+
+  }else if (pid < 0){
+    printf("Fork failed\n");
+    exit(1);
+  }
+}
+
+void process_ldir(){
+  int pid;
+
+  if((pid = fork()) == 0){
+
+    execl("/bin/ls", "ls", (char *)0);
+    printf("the execl call failed\n");
+    exit(1);
+
+  }else if (pid < 0){
+    printf("Fork failed\n");
+    exit(1);
+  }
+}
+
+void process_lcd(char * path){
+  int pid;
+
+  if((pid = fork()) == 0){
+    if (chdir(path) != 0){
+      printf("chdir failed\n");
+      exit(1);
+    }
+  }else if (pid < 0){
+    printf("Fork failed\n");
+    exit(1);
+  }
+}
+
+void process_get(char * filename, int sd){
+
+  /* Receive Network Byte Order int from server and convert it to file size */
+  int nbytes, file_size, nr2;
+  char buf2[20];
+
+  read(sd, &nbytes, sizeof(nbytes));
+  if(sizeof(file_size) == 2){
+    file_size = ntohs(nbytes);
+  }else{
+    file_size = ntohl(nbytes);
+  }
+
+  printf("File size is %d\n", file_size);
+
+  printf("Do you want to download file? Enter Y/N: ");
+  fgets(buf2, sizeof(buf2), stdin);
+  nr2 = strlen(buf2);
+  trim(buf2);
+
+  write(sd, buf2, nr2);
+
+  if(strcmp(buf2, "Y") == 0){
+    /* Downloading file
+     * Create file if it does not exist
+     */
+    int fd, nr3, nw3, total_bytes;
+    fd = open("foo", O_WRONLY|O_CREAT, 0766); //replcae = filename later
+    char buf3[MAX_BLOCK_SIZE];
+    nr3 = 0;
+
+    while(1){
+      /* Read file from socket
+       * If total bytes read equals to file size, exit while loop
+       */
+      nr3 = readn(sd, buf3, sizeof(buf3));
+      total_bytes += nr3;
+      if(total_bytes == file_size){
+        printf("Finish downloading\n");
+        break;
+      }
+
+      printf("Read nr = %d\n", nr3);
+
+      if (( nw3 = write(fd, buf3, nr3)) < 0){
+        printf("Failed to write to file\n");
+        exit(1);
+      }
+    }
+  }
+}
+
 int main(int argc, char *argv[])
 {
   int sd, n, nr, nw, i=0;
@@ -78,7 +174,7 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-
+  printf("VERSION 1.1\n");
   while (1) {
 
     printf("\nClient Input Command: ");
@@ -86,87 +182,55 @@ int main(int argc, char *argv[])
     nr = strlen(buf);
     trim(buf);
 
+    /* parse command line into command array*/
+    tokenise(buf, command_array);
+    char * client_command;
+    char * argument;
+    client_command = command_array[0];
+    argument = command_array[1];
+    printf("COMMAND: %s\n", client_command);
 
-    if (strcmp(buf, "quit")==0) {
+    if (strcmp(client_command, "quit")==0) {
       printf("Bye from client\n");
       exit(0);
     }
 
-    if (nr > 0) {
-      if ((nw=write(sd, buf, nr)) < nr) {
-        printf("Client: send error\n");
-        exit(1);
-      }
+    /*handle local client command*/
+    if (strcmp(client_command, "lpwd") == 0){
+      process_lpwd();
+    }else if(strcmp(client_command, "ldir") == 0){
+      process_ldir();
+    }else if(strcmp(client_command, "lcd") == 0) {
+      process_lcd(argument); //new path is passed as argument in command line
+    }else{
 
-
-      /* parse command line into command array*/
-      tokenise(buf, command_array);
-      char * client_command;
-      char * file_name;
-      client_command = command_array[0];
-      file_name = command_array[1];
-      printf("COMMAND: %s\n", client_command);
-
-      /* implement get method */
-
-      if(strcmp(client_command, "get") == 0){
-        /*if ((nr=read(sd, buf1, sizeof(buf1))) <= 0) {*/
-          /*printf("Client: receive error\n");*/
-          /*exit(1);*/
-        /*}*/
-
-        //buf1[nr] = '\0';
-        //printf("Server said: %s\n", buf1);
-        int nbytes, file_size;
-
-        read(sd, &nbytes, sizeof(nbytes));
-        if(sizeof(file_size) == 2){
-          file_size = ntohs(nbytes);
-        }else{
-          file_size = ntohl(nbytes);
+      /* handle command sent to server*/
+      if (nr > 0) {
+        if ((nw=write(sd, buf, nr)) < nr) {
+          printf("Client: send error\n");
+          exit(1);
         }
 
-        printf("File size is %d\n", file_size);
-
-        printf("Enter Y/N: ");
-        fgets(buf2, sizeof(buf2), stdin);
-        int nr2;
-        nr2 = strlen(buf2);
-        trim(buf2);
-        write(sd, buf2, nr2);
-
-        /* Downloading file
-         * Create file if it does not exist
-         * */
-        int fd, nr3, nw3, total_bytes;
-        fd = open("foo", O_WRONLY|O_CREAT, 0766);
-        char buf3[MAX_BLOCK_SIZE];
-        nr3 = 0;
-
-        while(1){
-          nr3 = readn(sd, buf3, sizeof(buf3));
-          total_bytes += nr3;
-          if(total_bytes == file_size){
-              printf("Finish downloading\n");
-              break;
-            }
-
-          printf("Read nr = %d\n", nr3);
-
-          if (( nw3 = write(fd, buf3, nr3)) < 0){
-            printf("Failed to write to file\n");
+        /* implement get method */
+        if(strcmp(client_command, "get") == 0){
+          process_get(argument, sd);
+        }else if(strcmp(client_command, "put") == 0){
+          //TO DO
+        }else if (strcmp(client_command, "cd") == 0){
+          //TO DO
+        }else if (strcmp(client_command, "pwd") == 0 || strcmp(client_command, "dir") == 0){
+          if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+            printf("Client: receive error\n");
             exit(1);
           }
+          buf1[nr] = '\0';
+          printf("---------Server Output-----------\n%s\n", buf1);
+        }else{
+          printf("Undefined command\n");
         }
-      }else{
-
-      if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
-        printf("Client: receive error\n");
-        exit(1);
       }
-      buf1[nr] = '\0';
-      printf("Server Output: %s\n", buf1);
     }
-    }
+    wait(NULL); //wait for child process to terminate. Get input from client again
   }
 }
+
