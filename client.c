@@ -61,6 +61,7 @@ void process_lcd(char * path){
   int pid;
 
   if((pid = fork()) == 0){
+      printf("Whats your path: %s", path);
     if (chdir(path) != 0){
       printf("chdir failed\n");
       exit(1);
@@ -189,7 +190,6 @@ int main(int argc, char *argv[])
     client_command = command_array[0];
     argument = command_array[1];
     printf("COMMAND: %s\n", client_command);
-    printf("ARG is: %s", argument);
 
     if (strcmp(client_command, "quit")==0) {
       printf("Bye from client\n");
@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
     }else if(strcmp(client_command, "ldir") == 0){
       process_ldir();
     }else if(strcmp(client_command, "lcd") == 0) {
-        printf("Whats your path: %s", argument);
+
       process_lcd(argument); //new path is passed as argument in command line
     }else{
 
