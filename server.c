@@ -146,6 +146,16 @@ int convert_from_NBO(int n){
   }
 }
 
+void display_error(int error_code){
+  if (error_code == -1){
+    printf("ERROR CODE -1 : File does not existi\n");
+  }else if (error_code == -2){
+    printf("ERROR CODE -2 : No read permission\n");
+  }else if (error_code == -3){
+    printf("ERROR CODE -3 : Cannot create or open file\n");
+  }
+}
+
 void process_get(char * file_name, int sd){
   int fd, nbytes, file_size, error_code = 0;
   struct stat f_info;
@@ -154,18 +164,17 @@ void process_get(char * file_name, int sd){
   char buf[MAX_BLOCK_SIZE];
 
   if ( lstat(file_name, &f_info) < 0 ) {
-    printf("File does not exist\n");
     error_code = -1;
   } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
-    printf("No read permission\n");
     error_code = -2;
   }
 
   /* Convert file size OR error code  to Network Byte Order and send to client*/
 
-  if (error_code != 0){
+  if (error_code < 0){
     nbytes = convert_to_NBO(error_code);
     write(sd, &nbytes, sizeof(error_code));
+    display_error(error_code);
     return;
   } else {
     file_size = f_info.st_size;
@@ -181,7 +190,7 @@ void process_get(char * file_name, int sd){
    * Read file from open file descriptor fd to buf and write data from buf to socket
    * Close fd after finish
    */
-  if( strcmp(msg2, "Y") == 0){
+  if( strcmp(msg2, "Y") == 0 || strcmp(msg2, "y") == 0){
     printf("\nStart sending file\n");
     int nr, nw;
     fd = open(file_name, O_RDONLY);
@@ -192,9 +201,8 @@ void process_get(char * file_name, int sd){
         break;
       }
 
-      printf("--DEBUG---read bytes: %d\n", nr);
-
-      if ((nw = writen(sd, buf, nr)) < 0){
+      if ((nw = writen(sd, buf, nr)) < nr){
+        printf("send error\n");
         exit(1);
       }
     }
@@ -206,7 +214,7 @@ void process_get(char * file_name, int sd){
 }
 
 void process_put(char * file_name, int sd){
-  char *msg1;
+  char *msg;
   int nbytes, file_size, error_code;
   read(sd, &nbytes, sizeof(nbytes));
   file_size = convert_from_NBO(nbytes);
@@ -222,6 +230,7 @@ void process_put(char * file_name, int sd){
 
   if ((fd = open(f_upload, O_WRONLY|O_CREAT, 0766)) < 0){
     error_code = -3;
+    display_error(error_code);
     nbytes = convert_to_NBO(error_code);
     write(sd, &nbytes, sizeof(nbytes));
     return;
@@ -238,17 +247,21 @@ void process_put(char * file_name, int sd){
     /* Read file from socket
      * If total bytes read equals to file size, exit while loop
      */
-    nr3 = readn(sd, buf3, sizeof(buf3));
-    printf("Bytes read: %d\n", nr3);
+    if ((nr3 = readn(sd, buf3, sizeof(buf3))) <= 0){
+      printf("server: read error\n");
+      exit(1);
+    }
     total_bytes += nr3;
     if(total_bytes == file_size){
-      printf("Finish uploading\n");
       write(fd, buf3, nr3);
+      msg = "Finish uploading";
+      printf("%s\n", msg);
+      write(sd, msg, strlen(msg)); //send to client to inform uploading finishes
       file_size = 0;
       break;
     }
 
-    if (( nw3 = write(fd, buf3, nr3)) < 0){
+    if (( nw3 = write(fd, buf3, nr3)) < nr3){
       printf("Failed to write to file\n");
       close(fd); //close file if cannot write to file
       exit(1);
@@ -276,7 +289,7 @@ void serve_a_client(int sd)
     tk_num = tokenise(buf, command_array);
 
     if(tk_num != -1){
-      printf("Number of argument: %d\n", tk_num);
+      printf("\nNumber of argument: %d\n", tk_num);
       for(int i = 0; i< tk_num; i++){
         printf("Argument %d: %s\n", i + 1, command_array[i]);
       }
@@ -309,7 +322,7 @@ void serve_a_client(int sd)
     }
 
     printf("Waiting for next command....\n\n");
-    wait(NULL); //wait until child process terminated, the parent continue to read next command
+    wait(NULL); //wait until child process terminated, parent process  continue to read next command
   }
 }
 
@@ -318,7 +331,6 @@ int main(int argc, char *argv[])
   int sd, nsd;
   pid_t pid;
   char * logfilename = "serverLog";
-
 
   socklen_t cli_addrlen;
   struct sockaddr_in ser_addr, cli_addr;

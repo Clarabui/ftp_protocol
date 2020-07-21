@@ -65,12 +65,12 @@ void process_ldir(){
 }
 
 void process_lcd(char * path){
-    // if chdir() doesn't return 0
-    // process exits with error
-    if (chdir(path) != 0){
-      printf("chdir() failed to execute\n");
-      exit(1);
-    }
+  // if chdir() doesn't return 0
+  // process exits with error
+  if (chdir(path) != 0){
+    printf("chdir() failed to execute\n");
+    exit(1);
+  }
 }
 
 int convert_from_NBO(int n){
@@ -89,17 +89,28 @@ int convert_to_NBO(int n) {
   }
 }
 
+void display_error(int error_code){
+  if (error_code == -1){
+    printf("ERROR CODE: -1 : File does not exist\n");
+  }else if (error_code == -2){
+    printf("ERROR CODE: -2 : No read permission\n");
+  }else if (error_code == -3){
+    printf("ERROR CODE: -3 : Cannot create or open file\n");
+  }
+}
+
 void process_get(char * filename, int sd){
 
   /* Receive Network Byte Order int from server and convert it to file size */
-  int nbytes, file_size_or_error_code, file_size, nr2;
+  int nbytes, file_size_or_error_code, file_size, error_code, nr2;
   char buf2[20];
 
   read(sd, &nbytes, sizeof(nbytes));
   file_size_or_error_code = convert_from_NBO(nbytes);
 
   if (file_size_or_error_code < 0) {
-    printf("Error %d\n", file_size_or_error_code);
+    error_code = file_size_or_error_code;
+    display_error(error_code);
     return;
   } else {
     file_size = file_size_or_error_code;
@@ -115,7 +126,7 @@ void process_get(char * filename, int sd){
 
   write(sd, buf2, nr2);
 
-  if(strcmp(buf2, "Y") == 0){
+  if(strcmp(buf2, "Y") == 0 || strcmp(buf2, "y") == 0){
     printf("OPEN FILE\n");
     /* Downloading file
      * Create file if it does not exist
@@ -134,8 +145,10 @@ void process_get(char * filename, int sd){
       /* Read file from socket
        * If total bytes read equals to file size, exit while loop
        */
-      nr3 = readn(sd, buf3, sizeof(buf3));
-      printf("Bytes read: %d\n", nr3);
+      if ((nr3 = readn(sd, buf3, sizeof(buf3))) <= 0){
+        printf("client: read error\n");
+        exit(1);
+      }
       total_bytes += nr3;
       if(total_bytes == file_size){
         printf("Finish downloading\n");
@@ -144,7 +157,7 @@ void process_get(char * filename, int sd){
         break;
       }
 
-      if (( nw3 = write(fd, buf3, nr3)) < 0){
+      if (( nw3 = write(fd, buf3, nr3)) < nr3){
         printf("Failed to write to file\n");
         close(fd); //close file if cannot write to file
         exit(1);
@@ -157,49 +170,47 @@ void process_get(char * filename, int sd){
 void process_put(char * filename, int sd){
   int fd, nbytes, file_size, error_code = 0;
   struct stat f_info;
-  char msg1[200];
-  char buf[MAX_BLOCK_SIZE];
-  
-  if ( lstat(filename, &f_info) < 0 ) {
-    printf("File does not exist\n");
-    error_code = -1;
-  } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
-    printf("No read permission\n");
-    error_code = -2;
-  }
+  char buf[MAX_BLOCK_SIZE], msg[200];
 
+  lstat(filename, &f_info); 
   file_size = f_info.st_size;
   nbytes = convert_to_NBO(file_size);
-  write(sd, &nbytes, sizeof(nbytes));
+  write(sd, &nbytes, sizeof(nbytes)); //send file size to server
 
   read(sd, &nbytes, sizeof(nbytes));
   error_code = convert_from_NBO(nbytes);
-
   if (error_code < 0){
-    //display error
+    display_error(error_code);
     return;
-  }else{
-    printf("\nStart sending file\n");
-    int nr, nw;
-    fd = open(filename, O_RDONLY);
+  }else{ //error_code received = 0, no error
+    printf("Server said: ready for uploading\n"); 
+  }
 
-    while (1){
-      if ((nr = read(fd, buf, sizeof(buf))) <= 0 ){
-        printf("Reach EOF\n");
-        break;
-      }
+  printf("\nStart uploading file\n");
+  int nr, nw;
+  fd = open(filename, O_RDONLY);
 
-      if ((nw = writen(sd, buf, nr)) < 0){
-        exit(1);
-      }
+  while (1){
+    if ((nr = read(fd, buf, sizeof(buf))) <= 0 ){
+      printf("Reach EOF\n");
+      break;
+    }
+
+    if ((nw = writen(sd, buf, nr)) < nr){
+      printf("Failed to write to socket\n");
+      exit(1);
     }
   }
+
+  read(sd, msg, sizeof(msg));
+  printf("%s\n", msg);
 }
+
 
 int main(int argc, char *argv[])
 {
 
-  int sd, n, nr, nw, i=0;
+  int sd, n, nr, nw, error_code = 0, i = 0;
   char buf[MAX_BLOCK_SIZE],
   input[MAX_BLOCK_SIZE],
   buf1[MAX_BLOCK_SIZE],
@@ -278,42 +289,72 @@ int main(int argc, char *argv[])
       process_ldir();
     }else if(strcmp(client_command, "lcd") == 0) {
       process_lcd(argument); //new path is passed as argument in command line
-    }else{
+    }else if(strcmp(client_command, "get") == 0){
 
-      /* handle command sent to server*/
-      if (nr > 0) {
+      printf("Sending to socket: %s\n", buf);
+      if ((nw=write(sd, buf, nr)) < nr) {
+        printf("Client: send error\n");
+        exit(1);
+      }
+
+      process_get(argument, sd);
+
+    }else if(strcmp(client_command, "put") == 0){
+      char * filename = argument;
+      struct stat f_info;
+
+      if ( lstat(filename, &f_info) < 0 ) {
+        error_code = -1;
+      } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
+        error_code = -2;
+      }
+
+      /* Check file exist & file read permission
+       * Display errors if any
+       * Else, send command line to socket
+       */
+
+      if (error_code < 0){
+        display_error(error_code);
+        printf("Cannot upload file\n");
+        error_code =0; //reset value of error code to 0 for the next read
+      }else{
         printf("Sending to socket: %s\n", buf);
         if ((nw=write(sd, buf, nr)) < nr) {
           printf("Client: send error\n");
           exit(1);
         }
 
-        /* implement get method */
-        if(strcmp(client_command, "get") == 0){
-          process_get(argument, sd);
-        }else if(strcmp(client_command, "put") == 0){
-          process_put(argument, sd);
-        }else if (strcmp(client_command, "cd") == 0){
-          if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
-            printf("Client: receive error\n");
-            exit(1);
-          }
-          buf1[nr] = '\0';
-          printf("---------Server Output-----------\n%s\n", buf1);
-
-        }else if (strcmp(client_command, "pwd") == 0 || strcmp(client_command, "dir") == 0){
-          if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
-            printf("Client: receive error\n");
-            exit(1);
-          }
-          buf1[nr] = '\0';
-          printf("---------Server Output-----------\n%s\n", buf1);
-        }else{
-          printf("Undefined command\n");
-        }
+        process_put(argument, sd);
       }
+    }else if (strcmp(client_command, "cd") == 0){
+      if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+        printf("Client: receive error\n");
+        exit(1);
+      }
+      buf1[nr] = '\0';
+      printf("---------Server Output-----------\n%s\n", buf1);
+
+    }else if (strcmp(client_command, "pwd") == 0) {
+      if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+        printf("Client: receive error\n");
+        exit(1);
+      }
+      buf1[nr] = '\0';
+      printf("---------Server Output-----------\n%s\n", buf1);
+    }else if ( strcmp(client_command, "dir") == 0){
+      if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
+        printf("Client: receive error\n");
+        exit(1);
+      }
+      buf1[nr] = '\0';
+      printf("---------Server Output-----------\n%s\n", buf1);
+
+    }else{
+      printf("Undefined command\n");
     }
-    wait(NULL); //wait for child process to terminate. Get input from client again
   }
+  wait(NULL); //wait for child process to terminate. Get input from client again
 }
+
 
