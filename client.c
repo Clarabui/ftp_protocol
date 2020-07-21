@@ -81,6 +81,14 @@ int convert_from_NBO(int n){
   }
 }
 
+int convert_to_NBO(int n) {
+  if (sizeof(n) == 2) {
+    return  htons(n);
+  } else {
+    return  htonl(n);
+  }
+}
+
 void process_get(char * filename, int sd){
 
   /* Receive Network Byte Order int from server and convert it to file size */
@@ -118,7 +126,7 @@ void process_get(char * filename, int sd){
     strcpy(f_download, "get_");
     strcat(f_download, filename);
 
-    fd = open(f_download, O_WRONLY|O_CREAT, 0766); //replace = filename later
+    fd = open(f_download, O_WRONLY|O_CREAT, 0766);
     char buf3[MAX_BLOCK_SIZE];
     total_bytes = 0;
 
@@ -136,8 +144,6 @@ void process_get(char * filename, int sd){
         break;
       }
 
-      printf("Read nr = %d\n", nr3);
-
       if (( nw3 = write(fd, buf3, nr3)) < 0){
         printf("Failed to write to file\n");
         close(fd); //close file if cannot write to file
@@ -148,15 +154,57 @@ void process_get(char * filename, int sd){
   }
 }
 
+void process_put(char * filename, int sd){
+  int fd, nbytes, file_size, error_code = 0;
+  struct stat f_info;
+  char msg1[200];
+  char buf[MAX_BLOCK_SIZE];
+  
+  if ( lstat(filename, &f_info) < 0 ) {
+    printf("File does not exist\n");
+    error_code = -1;
+  } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
+    printf("No read permission\n");
+    error_code = -2;
+  }
+
+  file_size = f_info.st_size;
+  nbytes = convert_to_NBO(file_size);
+  write(sd, &nbytes, sizeof(nbytes));
+
+  read(sd, &nbytes, sizeof(nbytes));
+  error_code = convert_from_NBO(nbytes);
+
+  if (error_code < 0){
+    //display error
+    return;
+  }else{
+    printf("\nStart sending file\n");
+    int nr, nw;
+    fd = open(filename, O_RDONLY);
+
+    while (1){
+      if ((nr = read(fd, buf, sizeof(buf))) <= 0 ){
+        printf("Reach EOF\n");
+        break;
+      }
+
+      if ((nw = writen(sd, buf, nr)) < 0){
+        exit(1);
+      }
+    }
+  }
+}
+
 int main(int argc, char *argv[])
 {
 
   int sd, n, nr, nw, i=0;
   char buf[MAX_BLOCK_SIZE],
-        input[MAX_BLOCK_SIZE],
-        buf1[MAX_BLOCK_SIZE],
-        buf2[MAX_BLOCK_SIZE],
-        host[60];
+  input[MAX_BLOCK_SIZE],
+  buf1[MAX_BLOCK_SIZE],
+  buf2[MAX_BLOCK_SIZE],
+  host[60];
 
 
   /* get server host name and port number */
@@ -208,7 +256,7 @@ int main(int argc, char *argv[])
     nr = strlen(buf);
     trim(buf);
     memcpy(input, buf, sizeof(buf));
- 
+
     /* parse command line into command array*/
     tokenise(input, command_array);
     char * client_command;
@@ -244,7 +292,7 @@ int main(int argc, char *argv[])
         if(strcmp(client_command, "get") == 0){
           process_get(argument, sd);
         }else if(strcmp(client_command, "put") == 0){
-          //TO DO
+          process_put(argument, sd);
         }else if (strcmp(client_command, "cd") == 0){
           if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
             printf("Client: receive error\n");

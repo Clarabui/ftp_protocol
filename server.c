@@ -138,6 +138,14 @@ int convert_to_NBO(int n) {
   }
 }
 
+int convert_from_NBO(int n){
+  if(sizeof(n) == 2){
+    return ntohs(n);
+  }else{
+    return ntohl(n);
+  }
+}
+
 void process_get(char * file_name, int sd){
   int fd, nbytes, file_size, error_code = 0;
   struct stat f_info;
@@ -162,7 +170,6 @@ void process_get(char * file_name, int sd){
   } else {
     file_size = f_info.st_size;
     nbytes = convert_to_NBO(file_size);
-
     write(sd, &nbytes, sizeof(nbytes));
   }
 
@@ -178,7 +185,7 @@ void process_get(char * file_name, int sd){
     printf("\nStart sending file\n");
     int nr, nw;
     fd = open(file_name, O_RDONLY);
-
+ 
     while (1){
       if ((nr = read(fd, buf, sizeof(buf))) <= 0 ){
         printf("Reach EOF\n");
@@ -196,6 +203,58 @@ void process_get(char * file_name, int sd){
   } else {
     printf("\nDont send file\n");
   }
+}
+
+void process_put(char * file_name, int sd){
+  char *msg1;
+  int nbytes, file_size, error_code;
+  read(sd, &nbytes, sizeof(nbytes));
+  file_size = convert_from_NBO(nbytes);
+
+  printf("File size is %d\n", file_size);
+
+
+  int fd, nr3, nw3, total_bytes;
+
+  char f_upload[100];       /*construct download filename with prefix put_filenam*/
+  strcpy(f_upload, "put_");
+  strcat(f_upload, file_name);
+
+  if ((fd = open(f_upload, O_WRONLY|O_CREAT, 0766)) < 0){
+    error_code = -3;
+    nbytes = convert_to_NBO(error_code);
+    write(sd, &nbytes, sizeof(nbytes));
+    return;
+  }else{
+    error_code = 0; //return code for successfully create the file (not error actually)
+    nbytes = convert_to_NBO(error_code);
+    write(sd, &nbytes, sizeof(nbytes));
+  }
+
+  char buf3[MAX_BLOCK_SIZE];
+  total_bytes = 0;
+
+  while(1){
+    /* Read file from socket
+     * If total bytes read equals to file size, exit while loop
+     */
+    nr3 = readn(sd, buf3, sizeof(buf3));
+    printf("Bytes read: %d\n", nr3);
+    total_bytes += nr3;
+    if(total_bytes == file_size){
+      printf("Finish uploading\n");
+      write(fd, buf3, nr3);
+      file_size = 0;
+      break;
+    }
+
+    if (( nw3 = write(fd, buf3, nr3)) < 0){
+      printf("Failed to write to file\n");
+      close(fd); //close file if cannot write to file
+      exit(1);
+    }
+  }
+  close(fd);
 }
 
 void serve_a_client(int sd)
@@ -243,8 +302,7 @@ void serve_a_client(int sd)
     }else if( strcmp(client_command, "get") == 0){
       process_get(file_name, sd);
     }else if( strcmp(client_command, "put") == 0){
-      //to-do
-      exit(0);
+      process_put(file_name, sd);
     }else{
       printf("Undefined command\n");
       exit(0);
