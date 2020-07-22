@@ -11,10 +11,8 @@
 #define MAX_BLOCK_SIZE (1024*5)
 
 
-char * cwd_userArg;
 char * client_command;
 char * server_command;
-extern int errno;
 unsigned long port;
 FILE * logFile;
 
@@ -22,12 +20,6 @@ FILE * logFile;
  * Purpose: claims all zombie process; if any
  * */
 void claim_children();
-/*
- * Purpose: trims input data
- *
- * This method adds '\0' when '\n' is found
- * */
-void trim(char input[]);
 /*
  * Purpose: Creates a daemon process to be run as a server listening to connections
  *
@@ -48,7 +40,7 @@ void process_dir(int sd);
 /*
  * Purpose: to change directory with given path
  * */
-void process_chdir(char * path, int sd);
+void process_cd(char * path, int sd);
 /*
  * Purpose:
  * */
@@ -59,6 +51,14 @@ int convert_to_NBO(int n);
  *  current directory in server and save it in current
  *  directory in client...
  * */
+
+/*
+ * Purpose: trims input data
+ *
+ * This method adds '\0' when '\n' is found
+ * */
+void trim(char str[]);
+
 void process_get(char * file_name, int sd);
 
 

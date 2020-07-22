@@ -23,6 +23,8 @@
 #include  <errno.h>
 #include  "stream.h"     /* MAX_BLOCK_SIZE, readn(), writen() */
 #include  "token.h"
+#include  "nbyte_converter.h"
+#include  "file_protocol_error_code.h"
 #include "server.h"
 
 #define   SERV_TCP_PORT   40005   /* default server listening port */
@@ -32,13 +34,6 @@ void claim_children()
     pid_t pid=1;
     while (pid>0) { /* claim as many zombies as we can */
         pid = waitpid(0, (int *)0, WNOHANG);
-    }
-}
-
-void trim(char input[]) {
-    size_t len = strlen(input);
-    if((len > 0) && (input[len-1] == '\n')){
-        input[--len] = '\0';
     }
 }
 
@@ -68,6 +63,14 @@ int daemon_init()
 
     return(0);
 }
+
+void trim(char str[]) {
+    size_t len = strlen(str);
+    if((len > 0) && (str[len-1] == '\n')){
+        str[--len] = '\0';
+    }
+}
+
 
 void process_pwd(int sd){
 
@@ -120,7 +123,7 @@ void process_dir(int sd){
     }
 }
 
-void process_chdir(char * path, int sd) {
+void process_cd(char * path, int sd) {
     char * msg;
     if( chdir(path) !=0){
         msg = "Unsuccessfully change directory";
@@ -128,32 +131,6 @@ void process_chdir(char * path, int sd) {
         msg = "Successfully change directory";
     }
     write(sd, msg, strlen(msg));
-}
-
-int convert_to_NBO(int n) {
-    if (sizeof(n) == 2) {
-        return  htons(n);
-    } else {
-        return  htonl(n);
-    }
-}
-
-int convert_from_NBO(int n){
-    if(sizeof(n) == 2){
-        return ntohs(n);
-    }else{
-        return ntohl(n);
-    }
-}
-
-void display_error(int error_code){
-    if (error_code == -1){
-        printf("ERROR CODE -1 : File does not existi\n");
-    }else if (error_code == -2){
-        printf("ERROR CODE -2 : No read permission\n");
-    }else if (error_code == -3){
-        printf("ERROR CODE -3 : Cannot create or open file\n");
-    }
 }
 
 void process_get(char * file_name, int sd){
@@ -311,7 +288,7 @@ void serve_a_client(int sd)
             server_command = "ls";
             process_dir(sd);
         }else if( strcmp(client_command, "cd") == 0){
-            process_chdir(path, sd);
+            process_cd(path, sd);
         }else if( strcmp(client_command, "get") == 0){
             process_get(file_name, sd);
         }else if( strcmp(client_command, "put") == 0){
@@ -348,14 +325,6 @@ int main(int argc, char *argv[])
     if (logFile == NULL){
         printf("ERROR: Can't create a log file\n");
         exit(3);
-    }
-
-    if ( argv[1] != NULL ) {
-        strcpy(cwd_userArg, argv[1]);
-        if (chdir(cwd_userArg) < 0) {
-            fprintf(logFile, "Can't set to directory, ERROR\n");
-        }
-        printf("Arg passed is: %s\n", cwd_userArg);
     }
 
     /* turn the program into a daemon */

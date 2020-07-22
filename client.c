@@ -23,16 +23,11 @@
 #include  <errno.h>
 #include  "stream.h"     /* MAX_BLOCK_SIZE, readn(), writen() */
 #include  "token.h"
-#include "client.h"
+#include  "nbyte_converter.h"
+#include  "file_protocol_error_code.h"
+#include  "client.h"
 
 #define   SERV_TCP_PORT  40005 /* default server listening port */
-
-void trim(char input[]) {
-    size_t len = strlen(input);
-    if((len > 0) && (input[len-1] == '\n')){
-        input[--len] = '\0';
-    }
-}
 
 void process_lpwd(){
     int pid;
@@ -71,32 +66,7 @@ void process_lcd(char * path){
         printf("chdir() failed to execute\n");
         exit(1);
     }
-}
-
-int convert_from_NBO(int n){
-    if(sizeof(n) == 2){
-        return ntohs(n);
-    }else{
-        return ntohl(n);
-    }
-}
-
-int convert_to_NBO(int n) {
-    if (sizeof(n) == 2) {
-        return  htons(n);
-    } else {
-        return  htonl(n);
-    }
-}
-
-void display_error(int error_code){
-    if (error_code == -1){
-        printf("ERROR CODE: -1 : File does not exist\n");
-    }else if (error_code == -2){
-        printf("ERROR CODE: -2 : No read permission\n");
-    }else if (error_code == -3){
-        printf("ERROR CODE: -3 : Cannot create or open file\n");
-    }
+    printf("Change directory successfully\n");
 }
 
 void process_get(char * filename, int sd){
@@ -171,7 +141,7 @@ void process_put(char * filename, int sd){
     struct stat f_info;
     char buf[MAX_BLOCK_SIZE], msg[200];
 
-    lstat(filename, &f_info); 
+    lstat(filename, &f_info);
     file_size = f_info.st_size;
     nbytes = convert_to_NBO(file_size);
     write(sd, &nbytes, sizeof(nbytes)); //send file size to server
@@ -182,7 +152,7 @@ void process_put(char * filename, int sd){
         display_error(error_code);
         return;
     }else{ //error_code received = 0, no error
-        printf("Server said: ready for uploading\n"); 
+        printf("Server said: ready for uploading\n");
     }
 
     printf("\nStart uploading file\n");
@@ -205,17 +175,41 @@ void process_put(char * filename, int sd){
     printf("%s\n", msg);
 }
 
+void process_remote_command(char full_command[], int sd) {
+    int nw, nr, full_command_len = strlen(full_command);
+    char output[MAX_BLOCK_SIZE];
 
-int main(int argc, char *argv[])
-{
+    printf("Sending to socket: %s\n", full_command);
 
+    if ((nw = write(sd, full_command, full_command_len)) < full_command_len) {
+        printf("Client: send error\n");
+        exit(1);
+    }
+
+    if ((nr = read(sd, output, sizeof(output))) <= 0) {
+        printf("Client: receive error\n");
+        exit(1);
+    }
+
+    output[nr] = '\0';
+    printf("---------Server Output-----------\n%s\n", output);
+}
+
+void trim(char str[]) {
+    size_t len = strlen(str);
+    if((len > 0) && (str[len-1] == '\n')){
+        str[--len] = '\0';
+    }
+}
+
+
+int main(int argc, char *argv[]) {
     int sd, n, nr, nw, error_code = 0, i = 0;
     char buf[MAX_BLOCK_SIZE],
     input[MAX_BLOCK_SIZE],
     buf1[MAX_BLOCK_SIZE],
     buf2[MAX_BLOCK_SIZE],
     host[60];
-
 
     /* get server host name and port number */
     if (argc==1) {  /* assume server running on the local host and on default port */
@@ -235,7 +229,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
     } else {
-        printf("Usage: %s [ <server host name> [ <server listening port> ] ]\n", argv[0]); 
+        printf("Usage: %s [ <server host name> [ <server listening port> ] ]\n", argv[0]);
         exit(1);
     }
 
@@ -259,13 +253,14 @@ int main(int argc, char *argv[])
     }
 
     printf("VERSION 1.1 CLIENT\n");
+
     while (1) {
 
         printf("\nClient Input Command: ");
         fgets(buf, sizeof(buf), stdin);
-        trim(buf);
         nr = strlen(buf);
         memcpy(input, buf, sizeof(buf));
+        trim(buf);
 
         /* parse command line into command array*/
         tokenise(input, command_array);
@@ -281,44 +276,48 @@ int main(int argc, char *argv[])
             exit(0);
         }
 
-        /*handle local client command*/
-        if (strcmp(client_command, "lpwd") == 0){
+        /* process client command given*/
+        if (strcmp(client_command, "lpwd") == 0) {
             process_lpwd();
-        }else if(strcmp(client_command, "ldir") == 0){
+        } else if(strcmp(client_command, "ldir") == 0) {
             process_ldir();
-        }else if(strcmp(client_command, "lcd") == 0) {
-            process_lcd(argument); //new path is passed as argument in command line
-        }else if(strcmp(client_command, "get") == 0){
-
+        } else if(strcmp(client_command, "lcd") == 0) {
+            process_lcd(argument);
+        } else if (strcmp(client_command, "dir") == 0 ||
+                strcmp(client_command, "pwd") == 0 ||
+                strcmp(client_command, "cd") == 0) {
+            process_remote_command(buf, sd);
+        } else if(strcmp(client_command, "get") == 0) {
             printf("Sending to socket: %s\n", buf);
+
             if ((nw=write(sd, buf, nr)) < nr) {
                 printf("Client: send error\n");
                 exit(1);
             }
 
             process_get(argument, sd);
-
-        }else if(strcmp(client_command, "put") == 0){
+        } else if (strcmp(client_command, "put") == 0) {
             char * filename = argument;
             struct stat f_info;
 
-            if ( lstat(filename, &f_info) < 0 ) {
+            if (lstat(filename, &f_info) < 0) {
                 error_code = -1;
-            } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
+            } else if (!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
                 error_code = -2;
             }
 
             /* Check file exist & file read permission
              * Display errors if any
-             * Else, send command line to socket
+             * Else, send user command line to socket
              */
 
-            if (error_code < 0){
+            if (error_code < 0) {
                 display_error(error_code);
                 printf("Cannot upload file\n");
                 error_code =0; //reset value of error code to 0 for the next read
-            }else{
+            } else {
                 printf("Sending to socket: %s\n", buf);
+
                 if ((nw=write(sd, buf, nr)) < nr) {
                     printf("Client: send error\n");
                     exit(1);
@@ -326,55 +325,10 @@ int main(int argc, char *argv[])
 
                 process_put(argument, sd);
             }
-        }else if (strcmp(client_command, "cd") == 0){
-
-            printf("Sending to socket: %s\n", buf);
-            if ((nw=write(sd, buf, nr)) < nr) {
-                printf("Client: send error\n");
-                exit(1);
-            }
-
-            if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
-                printf("Client: receive error\n");
-                exit(1);
-            }
-            buf1[nr] = '\0';
-            printf("---------Server Output-----------\n%s\n", buf1);
-
-        }else if (strcmp(client_command, "pwd") == 0) {
-
-            printf("Sending to socket: %s\n", buf);
-            if ((nw=write(sd, buf, nr)) < nr) {
-                printf("Client: send error\n");
-                exit(1);
-            }
-
-            if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
-                printf("Client: receive error\n");
-                exit(1);
-            }
-            buf1[nr] = '\0';
-            printf("---------Server Output-----------\n%s\n", buf1);
-        }else if ( strcmp(client_command, "dir") == 0){
-
-            printf("Sending to socket: %s\n", buf);
-            if ((nw=write(sd, buf, nr)) < nr) {
-                printf("Client: send error\n");
-                exit(1);
-            }
-
-            if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
-                printf("Client: receive error\n");
-                exit(1);
-            }
-            buf1[nr] = '\0';
-            printf("---------Server Output-----------\n%s\n", buf1);
-
-        }else{
+        } else {
             printf("Undefined command\n");
         }
+
         wait(NULL); //wait for child process to terminate. Get input from client again
     }
 }
-
-
