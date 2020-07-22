@@ -263,8 +263,8 @@ int main(int argc, char *argv[])
 
         printf("\nClient Input Command: ");
         fgets(buf, sizeof(buf), stdin);
-        nr = strlen(buf);
         trim(buf);
+        nr = strlen(buf);
         memcpy(input, buf, sizeof(buf));
 
         /* parse command line into command array*/
@@ -327,6 +327,13 @@ int main(int argc, char *argv[])
                 process_put(argument, sd);
             }
         }else if (strcmp(client_command, "cd") == 0){
+
+            printf("Sending to socket: %s\n", buf);
+            if ((nw=write(sd, buf, nr)) < nr) {
+                printf("Client: send error\n");
+                exit(1);
+            }
+
             if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
                 printf("Client: receive error\n");
                 exit(1);
@@ -335,6 +342,13 @@ int main(int argc, char *argv[])
             printf("---------Server Output-----------\n%s\n", buf1);
 
         }else if (strcmp(client_command, "pwd") == 0) {
+
+            printf("Sending to socket: %s\n", buf);
+            if ((nw=write(sd, buf, nr)) < nr) {
+                printf("Client: send error\n");
+                exit(1);
+            }
+
             if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
                 printf("Client: receive error\n");
                 exit(1);
@@ -342,6 +356,13 @@ int main(int argc, char *argv[])
             buf1[nr] = '\0';
             printf("---------Server Output-----------\n%s\n", buf1);
         }else if ( strcmp(client_command, "dir") == 0){
+
+            printf("Sending to socket: %s\n", buf);
+            if ((nw=write(sd, buf, nr)) < nr) {
+                printf("Client: send error\n");
+                exit(1);
+            }
+
             if ((nr=read(sd, buf1, sizeof(buf))) <= 0) {
                 printf("Client: receive error\n");
                 exit(1);
@@ -352,8 +373,8 @@ int main(int argc, char *argv[])
         }else{
             printf("Undefined command\n");
         }
+        wait(NULL); //wait for child process to terminate. Get input from client again
     }
-    wait(NULL); //wait for child process to terminate. Get input from client again
 }
 
 
