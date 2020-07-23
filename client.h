@@ -43,13 +43,13 @@ void process_get(char * filename, int sd);
 /*
  * Purpose: process remote command put, request for upload file to server
  *
- * This methods send filename to socket. Upon server acceptance, send data from open file to server
+ * This method sends filename to socket. Upon server acceptance, send data from open file to server
  * */
 void process_put(char * filename, int sd);
 /*
- * Purpose: process remote command including pwd, dir, cd
+ * Purpose: process remote commands including pwd, dir, cd
  *
- * This method send user command line to socket and display returned output from server
+ * This method sends user command line to socket and display returned output from server
  * */
 void process_remote_command(char full_command[], int sd);
 

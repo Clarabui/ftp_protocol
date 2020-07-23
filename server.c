@@ -130,7 +130,7 @@ void process_cd(char * path, int sd) {
     }else{
         msg = "Successfully change directory";
     }
-    write(sd, msg, strlen(msg));
+    write(sd, msg, strlen(msg)); //send message to client if change directory succeeds or not succeeds
 }
 
 void process_get(char * file_name, int sd){
@@ -141,9 +141,9 @@ void process_get(char * file_name, int sd){
     char buf[MAX_BLOCK_SIZE];
 
     if ( lstat(file_name, &f_info) < 0 ) {
-        error_code = -1;
+        error_code = -1; //file does not exist
     } else if(!(f_info.st_mode & S_IRUSR) || !(f_info.st_mode & S_IRGRP) || !(f_info.st_mode & S_IROTH)){
-        error_code = -2;
+        error_code = -2; //no read permissions
     }
 
     /* Convert file size OR error code  to Network Byte Order and send to client*/
@@ -163,7 +163,7 @@ void process_get(char * file_name, int sd){
     read(sd, msg2, sizeof(msg2));
     printf("Client confirm to download file? '%s'", msg2);
 
-    /* Client confirm to download file with Y
+    /* Client confirm to download file with Y or y
      * Read file from open file descriptor fd to buf and write data from buf to socket
      * Close fd after finish
      */
@@ -206,7 +206,7 @@ void process_put(char * file_name, int sd){
     strcat(f_upload, file_name);
 
     if ((fd = open(f_upload, O_WRONLY|O_CREAT, 0766)) < 0){
-        error_code = -3;
+        error_code = -3; //cannot create or open given file name
         display_error(error_code);
         nbytes = convert_to_NBO(error_code);
         write(sd, &nbytes, sizeof(nbytes));
@@ -325,6 +325,14 @@ int main(int argc, char *argv[])
     if (logFile == NULL){
         printf("ERROR: Can't create a log file\n");
         exit(3);
+    }
+
+    if ( argv[1] != NULL ) {
+        strcpy(cwd_userArg, argv[1]);
+        if (chdir(cwd_userArg) < 0) {
+            fprintf(logFile, "Can't set to directory, ERROR\n");
+        }
+        printf("Arg passed is: %s\n", cwd_userArg);
     }
 
     /* turn the program into a daemon */

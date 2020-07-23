@@ -63,10 +63,10 @@ void process_lcd(char * path){
     // if chdir() doesn't return 0
     // process exits with error
     if (chdir(path) != 0){
-        printf("chdir() failed to execute\n");
-        exit(1);
+        printf("Change directory unsuccessfully\n");
+    } else {
+        printf("Change directory successfully\n");
     }
-    printf("Change directory successfully\n");
 }
 
 void process_get(char * filename, int sd){

@@ -11,8 +11,10 @@
 #define MAX_BLOCK_SIZE (1024*5)
 
 
+char * cwd_userArg;
 char * client_command;
 char * server_command;
+char * command_array[MAX_NUM_TOKENS];
 unsigned long port;
 FILE * logFile;
 
@@ -29,40 +31,36 @@ void claim_children();
  * */
 int daemon_init();
 /*
- * Purpose: to list process current directory
- *
- * */
-void process_pwd(int sd);
-/*
- * Purpose: to list all contents in current directory
- * */
-void process_dir(int sd);
-/*
- * Purpose: to change directory with given path
- * */
-void process_cd(char * path, int sd);
-/*
- * Purpose:
- * */
-int convert_to_NBO(int n);
-/*
- * Purpose:
- *  Download file given from path, from the process
- *  current directory in server and save it in current
- *  directory in client...
- * */
-
-/*
  * Purpose: trims input data
  *
  * This method adds '\0' when '\n' is found
  * */
 void trim(char str[]);
-
+/*
+ * Purpose: to list process current directory
+ *
+ * */
+void process_pwd(int sd);
+/*
+ * Purpose: to list all file listings in current directory
+ * */
+void process_dir(int sd);
+/*
+ * Purpose: to change current process directory to given path
+ * */
+void process_cd(char * path, int sd);
+/*
+ * Purpose: process client's request for downloading file with given filename
+ *
+ * This method reads  data from given filename and send file data to client over socket
+ * */
 void process_get(char * file_name, int sd);
-
-
-
+/*
+ * Purpose: process client's request for uploading file with given filename
+ *
+ * This method read data from socket send by client and write to file
+ * */
+void process_put(char * file_name, int sd);
 /*
  * Purpose: Serve client commands such as cd, dir, pwd and get
  *
