@@ -59,7 +59,7 @@ void process_ldir(){
     }
 }
 
-void process_lcd(char * path){
+void process_lcd(char *path) {
     // if chdir() doesn't return 0
     // process exits with error
     if (chdir(path) != 0){
@@ -69,7 +69,7 @@ void process_lcd(char * path){
     }
 }
 
-void process_get(char * filename, int sd){
+void process_get(char *filename, int sd) {
 
     /* Receive Network Byte Order int from server and convert it to file size */
     int nbytes, file_size_or_error_code, file_size, error_code, nr2;

@@ -98,7 +98,7 @@ void process_pwd(int sd){
 }
 
 
-void process_dir(int sd){
+void process_dir(int sd) {
 
     /*create child process to execute dir command received
      *redirect standard output, standard error to socket
