@@ -82,6 +82,9 @@ void process_get(char * filename, int sd){
         error_code = file_size_or_error_code;
         display_error(error_code);
         return;
+    } else if (file_size_or_error_code == 0){
+        printf("Empty file\n");
+        return;
     } else {
         file_size = file_size_or_error_code;
     }
@@ -143,15 +146,21 @@ void process_put(char * filename, int sd){
 
     lstat(filename, &f_info);
     file_size = f_info.st_size;
+
     nbytes = convert_to_NBO(file_size);
     write(sd, &nbytes, sizeof(nbytes)); //send file size to server
+
+    if (file_size == 0){
+        printf("Empty file\n");
+        return;
+    }
 
     read(sd, &nbytes, sizeof(nbytes));
     error_code = convert_from_NBO(nbytes);
     if (error_code < 0){
         display_error(error_code);
         return;
-    }else{ //error_code received = 0, no error
+    } else{ //error_code received = 0, no error
         printf("Server said: ready for uploading\n");
     }
 

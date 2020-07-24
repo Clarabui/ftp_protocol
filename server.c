@@ -136,8 +136,7 @@ void process_cd(char * path, int sd) {
 void process_get(char * file_name, int sd){
     int fd, nbytes, file_size, error_code = 0;
     struct stat f_info;
-    char msg1[200];
-    char msg2[20];
+    char msg2[MAX_BLOCK_SIZE];
     char buf[MAX_BLOCK_SIZE];
 
     if ( lstat(file_name, &f_info) < 0 ) {
@@ -157,6 +156,10 @@ void process_get(char * file_name, int sd){
         file_size = f_info.st_size;
         nbytes = convert_to_NBO(file_size);
         write(sd, &nbytes, sizeof(nbytes));
+        if (file_size == 0){
+            printf("Empty file\n");
+            return;
+        }
     }
 
     /* Read client confirmation to download file (Y/N)*/
@@ -195,6 +198,11 @@ void process_put(char * file_name, int sd){
     int nbytes, file_size, error_code;
     read(sd, &nbytes, sizeof(nbytes));
     file_size = convert_from_NBO(nbytes);
+
+    if(file_size == 0){
+        printf("Empty file\n");
+        return;
+    }
 
     printf("File size is %d\n", file_size);
 
